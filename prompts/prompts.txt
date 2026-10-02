@@ -1,1 +1,4 @@
-No tenemos ni idea de Kafka, Railway, Dockers y hace un año que no tenemos nada con BBDD y GitHub. Guíanos con esta práctica.
+> No tenemos ni idea de Kafka, Railway, Dockers y hace un año que no tenemos nada con BBDD y GitHub. Guíanos con esta práctica.
+
+> Haz un diagrama entidad-relación que represente la BBDD que te adjunto.
+
