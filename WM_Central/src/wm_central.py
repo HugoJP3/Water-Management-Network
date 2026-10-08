@@ -1,18 +1,15 @@
 """
-WM_Central - Sistema central de WaterManagement (versión 1: solo sockets).
+WM_Central - Sistema central de WaterManagement.
 
-Qué hace esta versión:
-  - Arranca un servidor de sockets y espera conexiones de Monitores (WM_WS_M).
-  - Atiende REGISTER (alta/autenticación de una estación).
-  - Atiende STATUS (latido cada segundo: OK o FUGA).
-  - Detecta desconexiones (socket cerrado o sin latidos durante unos segundos).
-  - Guarda todo en SQLite a través de database.py.
-
-Qué falta (se añade después): Kafka (peticiones de riego, órdenes a las
-estaciones, telemetría) y el panel de monitorización.
+Piezas:
+  - Servidor de sockets: atiende a los Monitores (REGISTER y STATUS).
+  - Hilo consumidor de Kafka (kafka_io.py): peticiones de riego y telemetría.
+  - Hilo de mantenimiento: libera riegos sin telemetría y publica la lista
+    de estaciones para los operarios.
+  - La lógica de negocio está en logic.py; la BD en database.py.
 
 Uso:
-    python central.py <puerto_escucha> [--broker IP:PUERTO]
+    python wm_central.py <puerto_sockets> [IP:PUERTO_broker_kafka]
 """
 import argparse
 import socket

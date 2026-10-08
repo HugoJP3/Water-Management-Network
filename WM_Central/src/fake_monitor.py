@@ -1,4 +1,8 @@
 """
+    NO OLVIDAR: Este archivo es solo para pruebas. No se debe usar en producción.
+"""
+
+"""
 fake_monitor.py - Monitor de pega para probar WM_Central sin esperar al
 Monitor real. Simula una estación: se registra, manda latidos OK, una fuga,
 la resuelve y se desconecta.
