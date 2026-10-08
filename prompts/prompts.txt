@@ -2,3 +2,4 @@
 
 > Haz un diagrama entidad-relación que represente la BBDD que te adjunto.
 
+> Realiza una auditoría de los códigos que te paso buscando errores o posibles mejoras.
