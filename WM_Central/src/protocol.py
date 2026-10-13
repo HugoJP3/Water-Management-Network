@@ -18,6 +18,13 @@ Flujo de una conversación (ver Figura del enunciado):
 
 DATA es texto con los campos separados por '#':
     "REGISTER#WS-01#Parque_Retiro"
+
+Errores que puede lanzar este módulo (para los try/except de quien lo use):
+    ProtocolError    -> llegó algo que no respeta el protocolo, o el otro
+                        lado rechazó el mensaje (NACK) varias veces.
+    ConnectionError  -> el otro extremo cerró la conexión o envió EOT.
+    socket.timeout   -> el otro extremo no contestó a tiempo (solo si se ha
+                        puesto sock.settimeout(...)).
 """
 import socket
 
@@ -31,6 +38,10 @@ NACK = b"\x15"  # Negative ACK:  "recibido con errores, repítelo"
 
 SEP = "#"        # separador de campos dentro de DATA
 ENC = "utf-8"    # codificación del texto
+
+
+class ProtocolError(Exception):
+    """Algo no respeta el protocolo (trama inválida, NACK repetido...)."""
 
 
 # ---------------------------------------------------------------- LRC
@@ -74,7 +85,7 @@ def _read_frame(sock: socket.socket):
         # El otro extremo termina la conversación de forma limpia
         raise ConnectionError("Recibido EOT: fin de la conversación")
     if first != STX:
-        raise ValueError("Trama inválida: se esperaba STX")
+        raise ProtocolError(f"Trama inválida: se esperaba STX y llegó {first!r}")
     data = b""
     while True:
         b = _recv_exact(sock, 1)
@@ -86,18 +97,19 @@ def _read_frame(sock: socket.socket):
 
 
 # ------------------------------------------------------- envío y recepción
-def send_message(sock: socket.socket, message: str, retries: int = 3) -> bool:
+def send_message(sock: socket.socket, message: str, retries: int = 3) -> None:
     """Envía un mensaje y espera el ACK del receptor.
 
     Si recibe NACK reenvía (hasta 'retries' veces).
-    Devuelve True si el receptor lo confirmó con ACK.
+    Si tras todos los intentos no hay ACK, lanza ProtocolError
+    (así un mensaje perdido nunca pasa desapercibido).
     """
     frame = build_frame(message)
     for _ in range(retries):
         sock.sendall(frame)
         if _recv_exact(sock, 1) == ACK:
-            return True
-    return False
+            return
+    raise ProtocolError(f"Mensaje rechazado {retries} veces seguidas (NACK)")
 
 
 def recv_message(sock: socket.socket) -> str:
@@ -105,7 +117,8 @@ def recv_message(sock: socket.socket) -> str:
 
     Si el LRC es incorrecto responde NACK y sigue esperando el reenvío.
     Devuelve el texto de DATA (sin STX/ETX/LRC).
-    Lanza ConnectionError si el otro extremo cierra o manda EOT.
+    Lanza ConnectionError si el otro extremo cierra o manda EOT,
+    y ProtocolError si llega algo que no es una trama.
     """
     while True:
         data, lrc = _read_frame(sock)
