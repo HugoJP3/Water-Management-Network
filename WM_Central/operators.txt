@@ -1,0 +1,7 @@
+# Operarios dados de alta en CENTRAL (un operario por línea: ID o ID,Nombre)
+FO-01,Operario 1
+FO-02,Operario 2
+FO-03,Operario 3
+FO-04,Operario 4
+FO-05,Operario 5
+FO-12,Operario 12

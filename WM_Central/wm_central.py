@@ -6,21 +6,29 @@ Piezas:
   - Hilo consumidor de Kafka (kafka_io.py): peticiones de riego y telemetría.
   - Hilo de mantenimiento: libera riegos sin telemetría y publica la lista
     de estaciones para los operarios.
+  - Panel web (panel_web.py): monitorización y órdenes de CENTRAL.
   - La lógica de negocio está en logic.py; la BD en database.py.
 
 Uso:
-    python wm_central.py <puerto_sockets> [IP:PUERTO_broker_kafka]
+    python wm_central.py <puerto_sockets> [IP:PUERTO_broker_kafka] [--web-port N]
 Ejemplos:
     python wm_central.py 5000 localhost:9092
     python wm_central.py 5000              (solo sockets, sin Kafka)
+
+Variables de entorno útiles (para Docker/Railway):
+    WM_DB_PATH      ruta del fichero SQLite
+    PORT            puerto HTTP del panel web (Railway lo define solo)
+    PANEL_PASSWORD  contraseña del panel (y PANEL_USER, por defecto "admin")
 """
 import argparse
+import os
 import socket
 import threading
 import traceback
 
 import database as db
 import logic
+import panel_web
 import protocol as proto
 
 log = logic.log
@@ -138,10 +146,25 @@ def housekeeping(stop_event: threading.Event):
 
 
 # ------------------------------------------------------------------- arranque
-def seed_operators():
-    """Operarios de prueba FO-01..FO-20 (temporal)."""
-    for i in range(1, 21):
-        db.add_operator(f"FO-{i:02d}")
+def load_operators(path: str = "operators.txt"):
+    """Da de alta los operarios desde un fichero de texto (una línea por
+    operario: 'FO-01' o 'FO-01,Nombre'; las líneas con # se ignoran).
+    Si el fichero no existe, crea FO-01..FO-20 para poder probar."""
+    if not os.path.exists(path):
+        log(f"AVISO: no existe {path}; se crean FO-01..FO-20 de prueba")
+        for i in range(1, 21):
+            db.add_operator(f"FO-{i:02d}")
+        return
+    count = 0
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            op_id, _, name = line.partition(",")
+            db.add_operator(op_id.strip(), name.strip() or None)
+            count += 1
+    log(f"{count} operarios cargados desde {path}")
 
 
 def main():
@@ -150,11 +173,16 @@ def main():
                         help="Puerto de escucha del servidor de sockets (Monitores)")
     parser.add_argument("broker", nargs="?", default=None,
                         help="IP:PUERTO del broker de Kafka (si se omite, sin Kafka)")
+    parser.add_argument("--web-port", type=int,
+                        default=int(os.environ.get("PORT", 8080)),
+                        help="Puerto HTTP del panel web (por defecto $PORT o 8080)")
+    parser.add_argument("--no-panel", action="store_true",
+                        help="No arrancar el panel web")
     args = parser.parse_args()
 
     # Al arrancar: crear tablas y dejar todas las estaciones DESCONECTADAS
     db.init_db()
-    seed_operators()
+    load_operators()
     log(f"Estaciones conocidas: {[(s['id'], s['status']) for s in db.list_stations()]}")
 
     stop_event = threading.Event()
@@ -171,6 +199,9 @@ def main():
         log("AVISO: sin broker Kafka. Solo funcionan los sockets.")
 
     threading.Thread(target=housekeeping, args=(stop_event,), daemon=True).start()
+
+    if not args.no_panel:
+        panel_web.start(args.web_port, args.broker)
 
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
