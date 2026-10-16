@@ -74,11 +74,22 @@ class KafkaBus:
                     group_id=f"engine-{ws_id}-{int(time.time())}",
                     auto_offset_reset="latest",
                 )
+                self._esperar_asignacion()
                 log(f"Conectado a Kafka ({self.bootstrap})")
                 return
             except NoBrokersAvailable:
                 log(f"No hay Kafka en {self.bootstrap}. Reintentando en 3 s...")
                 time.sleep(3)
+
+    def _esperar_asignacion(self):
+        """Un consumidor nuevo tarda unos segundos en 'apuntarse' a las particiones.
+        Si CENTRAL enviara una orden antes, se perdería. Por eso esperamos aquí
+        a tenerlas asignadas y fijamos la posición (último mensaje)."""
+        limite = time.time() + 20
+        while not self.consumer.assignment() and time.time() < limite:
+            self.consumer.poll(timeout_ms=500)
+        for particion in self.consumer.assignment():
+            self.consumer.position(particion)
 
     def publish(self, topic, mensaje):
         try:
