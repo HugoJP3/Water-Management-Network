@@ -10,7 +10,7 @@ Ejemplo:
 Qué hace (todo con sockets, usando protocol.py):
   1. Abre un servidor en <puerto_monitor> para que se conecte su Engine.
   2. Se conecta a CENTRAL y se registra:   REGISTER#WS-01#Parque_Retiro
-  3. Espera al Engine, que se identifica:  ID#WS-01
+  3. Espera al Engine y le dice cuál es su id:   ID#WS-01   (el Engine contesta OK)
   4. Cada segundo:
         - Pregunta al Engine:  HEALTH  ->  OK / KO
         - Informa a CENTRAL:   STATUS#WS-01#OK   o   STATUS#WS-01#FUGA
@@ -103,13 +103,13 @@ def esperar_engine(servidor, ws_id):
     try:
         if not protocol.server_handshake(conn):
             raise protocol.ProtocolError("El Engine no empezó con ENQ")
-        campos = protocol.unpack(protocol.recv_message(conn))
-        if campos == ["ID", ws_id]:
-            protocol.send_message(conn, "OK")
+        # El Monitor le dice al Engine qué estación es; el Engine confirma con OK
+        protocol.send_message(conn, protocol.pack("ID", ws_id))
+        respuesta = protocol.recv_message(conn)
+        if respuesta == "OK":
             log(f"Engine conectado desde {addr[0]}:{addr[1]}")
             return conn
-        protocol.send_message(conn, "KO")
-        log(f"Engine rechazado: se identificó como {campos} y yo soy {ws_id}")
+        log(f"Engine rechazado: contestó {respuesta!r} al ID")
     except ERRORES_RED as e:
         log(f"Fallo al conectar el Engine: {e}")
     conn.close()
