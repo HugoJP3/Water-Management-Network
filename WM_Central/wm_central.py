@@ -22,6 +22,7 @@ Variables de entorno útiles (para Docker/Railway):
 """
 import argparse
 import os
+import signal
 import socket
 import threading
 import traceback
@@ -193,8 +194,9 @@ def main():
     if args.broker:
         import kafka_io
         kafka_io.connect(args.broker)
-        threading.Thread(target=kafka_io.consume_forever,
-                         args=(args.broker, stop_event), daemon=True).start()
+        consumer_thread = threading.Thread(target=kafka_io.consume_forever,
+                                          args=(args.broker, stop_event), daemon=True)
+        consumer_thread.start()
     else:
         log("AVISO: sin broker Kafka. Solo funcionan los sockets.")
 
@@ -210,6 +212,12 @@ def main():
     server.settimeout(1.0)   # para que Ctrl+C funcione también en Windows
     log(f"WM_Central escuchando sockets en el puerto {args.port}")
 
+
+    # ------------------------------------------------------------ Ctrl+C, SIGTERM (docker stop y docker restart)
+    def on_sigterm(signum, frame):
+        raise KeyboardInterrupt
+    signal.signal(signal.SIGTERM, on_sigterm)
+
     try:
         while True:
             try:
@@ -223,6 +231,8 @@ def main():
     finally:
         stop_event.set()
         server.close()
+        if consumer_thread is not None:
+            consumer_thread.join(timeout=5.0) # Cerrar el consumidor de Kafka antes de salir
         if kafka_io is not None:
             kafka_io.close()
 
