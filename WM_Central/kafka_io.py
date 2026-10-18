@@ -12,7 +12,7 @@ Conceptos:
 import time
 import traceback
 
-from confluent_kafka import Consumer, KafkaError, KafkaException, Producer
+from confluent_kafka import OFFSET_END, Consumer, KafkaError, KafkaException, Producer
 from confluent_kafka.admin import AdminClient, NewTopic
 
 import logic
@@ -90,8 +90,16 @@ def consume_forever(bootstrap: str, stop_event):
         # (no queremos abrir riegos de hace horas).
         "auto.offset.reset": "latest",
         "enable.auto.commit": True,
+        "session.timeout.ms": 10000,
     })
-    consumer.subscribe([logic.T_FO_REQUESTS, logic.T_WS_TELEMETRY])
+
+    def on_assign(consumer, partitions):
+        # Si Central se reinicia, no queremos reprocesar peticiones antiguas.
+        for p in partitions:
+            p.offset = OFFSET_END
+        consumer.assign(partitions)
+
+    consumer.subscribe([logic.T_FO_REQUESTS, logic.T_WS_TELEMETRY], on_assign=on_assign)
     logic.log("Consumidor Kafka escuchando fo-requests y ws-telemetry")
 
     try:
