@@ -13,4 +13,4 @@ RUN mkdir -p /data
 
 EXPOSE 5000 8080
 
-CMD python wm_central.py ${SOCKET_PORT:-5000} ${KAFKA_BROKER:-broker:29092}
+CMD exec python wm_central.py ${SOCKET_PORT:-5000} ${KAFKA_BROKER:-broker:29092}
