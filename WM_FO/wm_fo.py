@@ -29,6 +29,7 @@ Fichero de peticiones: una por línea, estación y segundos, por ejemplo
     Se envía la primera y, cuando termina (con éxito o fracaso), se esperan
     4 segundos antes de enviar la siguiente.
 """
+import os
 import re
 import sys
 import threading
@@ -41,7 +42,7 @@ TOPIC_ESTADOS = "ws-status"       # propuesta, ver arriba
 ESPERA_REPLY = 15       # segundos esperando que Central autorice o deniegue
 MARGEN_RESUMEN = 30     # segundos extra (sobre la duración) esperando el SUMMARY
 PAUSA_FICHERO = 4       # segundos entre peticiones del fichero (lo pide el enunciado)
-FICHERO_DEFECTO = "requests.txt"
+FICHERO_DEFECTO = os.path.join(os.path.dirname(__file__), "requests.txt")
 
 SEP = "#"
 
