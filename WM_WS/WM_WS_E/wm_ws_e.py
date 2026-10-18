@@ -192,6 +192,11 @@ class Engine:
         orden = campos[0]
         log(f"Orden de CENTRAL: {texto}")
 
+        if (campos[0] in ("NOTIFY", "REPLY", "SUMMARY") and len(campos) > 3
+            and campos[1] == "MANUAL" and campos[2] == self.ws_id):
+            log("CENTRAL " + " ".join(campos[3:]))
+            return
+
         if orden == "START" and len(campos) >= 4:
             try:
                 segundos = int(campos[3])
@@ -305,7 +310,8 @@ class Engine:
                 except ValueError:
                     print("Número no válido")
                     continue
-                ok, motivo = self.iniciar_riego("MANUAL", segundos)
+                ok, motivo = self.bus.publish("fo-request", protocol.pack("REQUEST", "MANUAL", self.ws_id, segundos))
+                log(f"Solicitud de riego manual enviada a CENTRAL ({segundos} s)")
                 if not ok:
                     print(f"No se puede regar: {motivo}")
             elif opcion == "2":

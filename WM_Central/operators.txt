@@ -5,3 +5,6 @@ FO-03,Operario 3
 FO-04,Operario 4
 FO-05,Operario 5
 FO-12,Operario 12
+
+# La estación se comporta como un operario a la hora de comunicar un riego manual
+MANUAL,Riego manual desde una estación
