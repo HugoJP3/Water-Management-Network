@@ -61,7 +61,10 @@ class KafkaBus:
 
     def conectar(self, ws_id):
         from kafka import KafkaProducer, KafkaConsumer
-        from kafka.errors import NoBrokersAvailable
+        try:
+            from kafka.errors import NoBrokersAvailable as ErrorSinBroker
+        except ImportError:
+            from kafka.errors import KafkaTimeoutError as ErrorSinBroker    
         while True:
             try:
                 self.producer = KafkaProducer(bootstrap_servers=self.bootstrap)
@@ -77,7 +80,7 @@ class KafkaBus:
                 self._esperar_asignacion()
                 log(f"Conectado a Kafka ({self.bootstrap})")
                 return
-            except NoBrokersAvailable:
+            except ErrorSinBroker:
                 log(f"No hay Kafka en {self.bootstrap}. Reintentando en 3 s...")
                 time.sleep(3)
 
