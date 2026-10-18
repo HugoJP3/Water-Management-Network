@@ -36,6 +36,8 @@ import protocol
 
 TOPIC_COMANDOS = "ws-commands"
 TOPIC_TELEMETRIA = "ws-telemetry"
+TOPIC_PETICIONES = "fo-requests"
+TOPIC_NOTIFICACIONES = "fo-notifications"
 
 CAUDAL_MIN = 4.5   # L/min, el caudal simulado varía entre estos dos valores
 CAUDAL_MAX = 6.0
@@ -72,7 +74,7 @@ class KafkaBus:
                 # recibe TODAS las órdenes (si compartieran grupo, se las repartirían)
                 # y al reiniciar no recibe órdenes antiguas.
                 self.consumer = KafkaConsumer(
-                    TOPIC_COMANDOS,
+                    TOPIC_COMANDOS, TOPIC_NOTIFICACIONES,
                     bootstrap_servers=self.bootstrap,
                     group_id=f"engine-{ws_id}-{int(time.time())}",
                     auto_offset_reset="latest",
@@ -98,8 +100,10 @@ class KafkaBus:
         try:
             self.producer.send(topic, mensaje.encode("utf-8"))
             self.producer.flush(timeout=3)
+            return True, ""
         except Exception as e:
             log(f"No se pudo publicar en {topic}: {e}")
+            return False, str(e)
 
     def escuchar(self, callback):
         """Bloquea para siempre, llamando a callback(texto) por cada mensaje."""
@@ -187,15 +191,18 @@ class Engine:
         """START#WS-01#FO-12#60 | STOP#WS-01 | BLOCK#WS-01 | ACTIVATE#WS-01
         (con ALL en lugar del id, va dirigido a todas las estaciones)."""
         campos = protocol.unpack(texto)
-        if len(campos) < 2 or campos[1] not in (self.ws_id, "ALL"):
-            return   # no es para mí
-        orden = campos[0]
-        log(f"Orden de CENTRAL: {texto}")
-
+        
+        # Respuesta de CENTRAL a peticiones de riego manual: NOTIFY#MANUAL#WS-01#OK
         if (campos[0] in ("NOTIFY", "REPLY", "SUMMARY") and len(campos) > 3
             and campos[1] == "MANUAL" and campos[2] == self.ws_id):
             log("CENTRAL " + " ".join(campos[3:]))
             return
+
+        #----------------------------------------- órdenes de CENTRAL (Kafka)
+        if len(campos) < 2 or campos[1] not in (self.ws_id, "ALL"):
+            return   # no es para mí
+        orden = campos[0]
+        log(f"Orden de CENTRAL: {texto}")
 
         if orden == "START" and len(campos) >= 4:
             try:
@@ -310,10 +317,11 @@ class Engine:
                 except ValueError:
                     print("Número no válido")
                     continue
-                ok, motivo = self.bus.publish("fo-request", protocol.pack("REQUEST", "MANUAL", self.ws_id, segundos))
+                ok, motivo = self.bus.publish(TOPIC_PETICIONES, protocol.pack("REQUEST", "MANUAL", self.ws_id, segundos))
                 log(f"Solicitud de riego manual enviada a CENTRAL ({segundos} s)")
                 if not ok:
-                    print(f"No se puede regar: {motivo}")
+                    print(f"No se puede regar: {motivo} (¿Kafka caído?)")
+
             elif opcion == "2":
                 if not self.terminar_riego("MANUAL"):
                     print("No hay ningún riego en curso")
