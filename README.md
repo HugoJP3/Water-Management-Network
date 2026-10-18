@@ -29,9 +29,9 @@ docker compose logs -f central  # Ctrl+C para salir de los logs
 
 | Programa      | comando |
 |-------------- |--------------|
-| Central       | Lanzar Docker (arriba) |
-| Monitor       | python .\WM_WS\WM_WS_M\wm_ws_m.py **puerto_monitor** localhost:5000 ID_ws       |
-| Engine        | python .\WM_WS\WM_WS_E\wm_ws_e.py localhost:9092 localhost:**puerto_monitor** (puerto) |
-| FO            | python .\WM_FO\wm_fo.py localhost:9092 **ID_operario** |
+| **Central**       | Lanzar Docker (arriba) |
+| **Monitor**       | python .\WM_WS\WM_WS_M\wm_ws_m.py *puerto_monitor* localhost:5000 ID_ws *ubicacion*      |
+| **Engine**        | python .\WM_WS\WM_WS_E\wm_ws_e.py localhost:9092 localhost:*puerto_monitor* (puerto) |
+| **FO**            | python .\WM_FO\wm_fo.py localhost:9092 *ID_operario* |
 
 ---
