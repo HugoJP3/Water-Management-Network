@@ -22,7 +22,22 @@ services:
       KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
       CLUSTER_ID: "gTBb85_WRXu6oQgq-brTQw"
 
-  mongo:
-    image: mongo:latest
+  central:
+    build: ./WM_Central
+    container_name: wm_central
+    depends_on:
+      - broker
     ports:
-      - 27017:27017
+      - "5000:5000"              # sockets de los Monitores
+      - "8080:8080"              # panel web -> http://localhost:8080
+    environment:
+      SOCKET_PORT: "5000"
+      KAFKA_BROKER: "broker:29092"   # desde DENTRO de la red de Docker se usa broker:29092
+      PORT: "8080"
+      PANEL_PASSWORD: "${PANEL_PASSWORD:-}"
+    volumes:
+      - central-data:/data       # la BD SQLite sobrevive a reinicios
+    restart: unless-stopped
+
+volumes:
+  central-data:

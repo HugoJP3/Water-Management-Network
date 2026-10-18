@@ -1,3 +1,11 @@
-fake_monitor.py
-*.db
 __pycache__/
+*.pyc
+*.db
+.git
+.gitignore
+.dockerignore
+Dockerfile
+
+# Herramientas de prueba propias: no van en la imagen de producción
+fake_*.py
+test_*.py
