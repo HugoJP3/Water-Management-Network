@@ -13,8 +13,7 @@ Todo va por KAFKA (este módulo no usa sockets):
     escucha en  fo-notifications  NOTIFY#FO-12#WS-01#texto
                                   REPLY#FO-12#WS-01#ACCEPTED   (o DENIED#motivo)
                                   SUMMARY#FO-12#WS-01#litros#segundos#motivo
-    escucha en  ws-status         STATE#WS-01#ESTADO#Ubicacion   (PROPUESTA: hay que
-                                  acordar este tema con Hugo; sirve para el menú 3)
+    escucha en  ws-status         STATIONS#WS-01|Campello|FUGA#WS-02|Retiro|DISPONIBLE
 
 Cómo termina una petición:
     - REPLY DENIED   -> fallo (fin)
@@ -133,10 +132,16 @@ class FieldOperator:
 
     def _procesar_estado(self, texto):
         campos = texto.split(SEP)
-        if len(campos) >= 3 and campos[0] == "STATE":
-            ubicacion = campos[3] if len(campos) > 3 else "?"
-            with self.cond:
-                self.estaciones[campos[1]] = (campos[2], ubicacion)
+        if campos[0] != "STATIONS":
+            return
+        nuevas = {}
+        for dato in campos[1:]:
+            partes = dato.split("|")
+            if len(partes) == 3:
+                ws, ubicacion, estado = partes
+                nuevas[ws] = (estado, ubicacion)
+        with self.cond:
+            self.estaciones = nuevas
 
     def _procesar_notificacion(self, texto):
         campos = texto.split(SEP)

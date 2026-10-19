@@ -1,0 +1,4 @@
+// estación#segundos
+WS-01#10
+WS-02#5
+WS-01#8
