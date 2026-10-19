@@ -35,3 +35,29 @@ docker compose logs -f central  # Ctrl+C para salir de los logs
 | **FO**            | python .\WM_FO\wm_fo.py localhost:9092 *ID_operario* |
 
 ---
+### Añadir operarios
+Añade operarios al archivo operators.txt que se carga al iniciar central. Si no se carga ningún archivo, se crearán IDs de 01 a 20.
+Por ejemplo:
+```
+# (Un operario por línea: ID o ID,Nombre)
+# Operarios dados de alta en CENTRAL
+FO-01,Operario 1
+FO-02,Operario 2
+FO-03,Operario 3
+FO-04,Operario 4
+FO-05,Operario 5
+FO-12,Operario 12
+```
+
+---
+### Requirements.txt
+Archivo en WM_FO pensado para ejecutar una serie de instrucciones sobre Water Stations sin necesidad de ejecutar manualmente todas ellas. Las instrucciones se ejecutan de forma secuencial dejando un margen de una a otra.
+
+Edita el archivo requirements.txt en WM_FO para añadir instrucciones. Por ejemplo:
+
+```
+// estación#segundos
+WS-01#10
+WS-02#5
+WS-01#8
+```
