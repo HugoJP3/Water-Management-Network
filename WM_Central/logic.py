@@ -89,6 +89,39 @@ def send(topic: str, message: str):
         _sender(topic, message)
 
 
+# ---------------------------------------------------------------- operarios
+# Operarios INTERNOS del sistema. Viven en el código, no en operators.txt.
+#   ENGINE  -> riego pedido desde el menú de la propia estación (Engine)
+#   CENTRAL -> riego iniciado desde el panel de CENTRAL
+# operators.txt queda solo para los operarios reales que da de alta el admin.
+INTERNAL_OPERATORS = {
+    "ENGINE": "Riego manual desde la estación",
+    "CENTRAL": "Riego iniciado desde CENTRAL",
+}
+
+
+def is_valid_operator(operator_id: str) -> bool:
+    """Un operario es válido si es interno del sistema o está dado de alta en la BD."""
+    return operator_id in INTERNAL_OPERATORS or db.operator_exists(operator_id)
+
+
+def operators_overview() -> list:
+    """Lista para el panel: internos + dados de alta, con la estación en la que
+    está regando cada uno ahora mismo (si lo está)."""
+    regando = {}
+    for s in db.list_stations():
+        if s["status"] == db.WATERING and s["operator_id"]:
+            regando.setdefault(s["operator_id"], []).append(s["id"])
+    filas = [{"id": i, "name": n, "system": True}
+             for i, n in INTERNAL_OPERATORS.items()]
+    for o in db.list_operators():
+        if o["id"] not in INTERNAL_OPERATORS:
+            filas.append({"id": o["id"], "name": o["name"] or "", "system": False})
+    for f in filas:
+        f["watering_at"] = regando.get(f["id"], [])
+    return filas
+
+
 def notify(operator_id: str, ws_id: str, text: str):
     """Paso informativo para el operario (y también en pantalla de Central)."""
     log(f"[{operator_id} / {ws_id}] {text}")
@@ -173,7 +206,7 @@ def handle_request(fields):
         _deny(op, ws_id, "Tiempo límite inválido")
         return
 
-    if not db.operator_exists(op):
+    if not is_valid_operator(op):
         _deny(op, ws_id, "Operario no registrado")
         return
 
