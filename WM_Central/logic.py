@@ -95,8 +95,8 @@ def send(topic: str, message: str):
 #   CENTRAL -> riego iniciado desde el panel de CENTRAL
 # operators.txt queda solo para los operarios reales que da de alta el admin.
 INTERNAL_OPERATORS = {
-    "ENGINE": "Riego manual desde la estación",
-    "CENTRAL": "Riego iniciado desde CENTRAL",
+    "ENGINE": "Admin: Riego manual desde la estación",
+    "CENTRAL": "Admin: Riego iniciado desde central",
 }
 
 
