@@ -18,10 +18,39 @@
 ### Lanzar Docker
 
 ```
-docker compose down             # (opcional) Limpiar lo anterior
-docker compose build central    # Generar la imagen
-docker compose up -d
-docker compose logs -f central  # Ctrl+C para salir de los logs
+docker compose down                         # Limpiar
+
+docker compose build central                # Central
+docker build -t wm_fo ./WM_FO               # FO
+docker build -t wm_ws_m ./WM_WS/WM_WS_M     # Monitor
+docker build -t wm_ws_e ./WM_WS/WM_WS_E     # Engine
+
+docker compose up -d                        # Lanzar
+
+docker compose logs -f central  # Ctrl+C para salir
+```
+
+```
+# Probar un operario
+docker run -it --rm wm_fo localhost:9092 FO-12 [requests.txt]
+```
+
+```
+# Probar un monitor en puerto local 6001
+docker run -d --name ws_m1 -p 6001:6001 wm_ws_m 6001 localhost:5000 WS-01 Retiro
+```
+
+```
+# Probar un engine conectado a ese monitor
+docker run -it --rm wm_ws_e localhost:9092 host.docker.internal:6001
+```
+
+```
+# Exportar (portabilidad futura)
+docker save wm_fo wm_ws_m wm_ws_e -o /ruta_usb/wm.tar
+
+#Cargar paquetes en máquina
+docker load -i wm.tar
 ```
 
 ---
