@@ -1,4 +1,5 @@
 services:
+  # Broker Kafka en modo KRaft (sin Zookeeper)
   broker:
     image: apache/kafka:latest
     hostname: broker
@@ -22,6 +23,7 @@ services:
       KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
       CLUSTER_ID: "gTBb85_WRXu6oQgq-brTQw"
 
+  # Módulo Central de WM
   central:
     build: ./WM_Central
     container_name: wm_central
@@ -35,10 +37,11 @@ services:
       SOCKET_PORT: "5000"
       KAFKA_BROKER: "broker:29092"   # desde DENTRO de la red de Docker se usa broker:29092
       PORT: "8080"
-      PANEL_PASSWORD: "${PANEL_PASSWORD:-}"
+      PANEL_PASSWORD: "${PANEL_PASSWORD:-}" # Futura contraseña del panel web (si no se define, no hay contraseña)
     volumes:
       - central-data:/data       # la BD SQLite sobrevive a reinicios
     restart: unless-stopped
+
 
 volumes:
   central-data:
