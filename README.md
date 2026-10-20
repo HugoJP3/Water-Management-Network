@@ -48,10 +48,11 @@ FO-04,Operario 4
 FO-05,Operario 5
 FO-12,Operario 12
 ```
+Es necesario rehacer la imagen de Docker de central tras modificar operators.txt para que se apliquen los cambios.
 
 ---
-### Requirements.txt
-Archivo en WM_FO pensado para ejecutar una serie de instrucciones sobre Water Stations sin necesidad de ejecutar manualmente todas ellas. Las instrucciones se ejecutan de forma secuencial dejando un margen de una a otra.
+### requirements.txt
+Archivo en WM_FO pensado para ejecutar una serie de instrucciones sobre Water Stations sin necesidad de ejecutar manualmente todas ellas. Las instrucciones se ejecutan de forma secuencial dejando un margen de una a otra (margen de 4 segundos).
 
 Edita el archivo requirements.txt en WM_FO para añadir instrucciones. Por ejemplo:
 
@@ -61,3 +62,4 @@ WS-01#10
 WS-02#5
 WS-01#8
 ```
+Para ejecutar requirements.txt es necesario logearse como Field Operator y seleccionar la opción 
