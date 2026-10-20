@@ -1,9 +1,9 @@
 # Water Management Network
-### SISTEMAS DISTRIBUIDOS
+## SISTEMAS DISTRIBUIDOS
 > Práctica no guiada: Sockets, Streaming de Eventos, Colas y modularidad.
 
 
-# Información clave Despliegue
+# Información Despliegue
 
 ---
 ### Direcciones
@@ -16,6 +16,7 @@
 
 ---
 ### Lanzar Docker
+Cómo generar y lanzar las imágenes de FO, Central, WS_E y WS_M
 
 ```
 docker compose down                         # Limpiar
@@ -32,17 +33,17 @@ docker compose logs -f central  # Ctrl+C para salir
 
 ```
 # Probar un operario
-docker run -it --rm wm_fo localhost:9092 FO-12 [requests.txt]
+docker run -it --rm --network water-management-network_default wm_fo broker:29092 FO-01
 ```
 
 ```
 # Probar un monitor en puerto local 6001
-docker run -d --name ws_m1 -p 6001:6001 wm_ws_m 6001 localhost:5000 WS-01 Retiro
+docker run -it --rm --name ws_m1 --network water-management-network_default -p 6001:6001 wm_ws_m 6001 wm_central:5000 WS-01 Campello
 ```
 
 ```
 # Probar un engine conectado a ese monitor
-docker run -it --rm wm_ws_e localhost:9092 host.docker.internal:6001
+docker run -it --rm --network water-management-network_default wm_ws_e broker:29092 ws_m1:6001
 ```
 
 ```
@@ -54,7 +55,8 @@ docker load -i wm.tar
 ```
 
 ---
-### Arrancar programas ( versión beta antes de despliegue en Railway )
+### Arrancar programas ( versión Local )
+Cómo arranzar los programas en local para pruebas, sin Docker (solo para central) y sin Railway
 
 | Programa      | comando |
 |-------------- |--------------|
