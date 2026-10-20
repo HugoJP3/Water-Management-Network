@@ -73,6 +73,12 @@ def operator_exists(operator_id) -> bool:
                         (operator_id,)).fetchone()
     return row is not None
 
+def list_operators():
+    """Devuelve la lista de todos los operarios registrados."""
+    with _conn() as c:
+        rows = c.execute("SELECT id, name FROM operator ORDER BY id").fetchall()
+    return [dict(row) for row in rows]
+
 
 # ----------------------------------------------------------------- estaciones
 def _derive_status(row) -> str:

@@ -1,7 +1,6 @@
 """
 panel_web.py - Panel de monitorización y control de WM_Central (versión web).
 """
-
 import base64
 import hmac
 import json
@@ -9,6 +8,7 @@ import os
 import re
 import threading
 import time
+import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import database as db
@@ -34,6 +34,7 @@ def _state() -> dict:
             "operator": s["operator_id"] if s["status"] == db.WATERING else None,
         } for s in stations],
         "summary": summary,
+        "operators": logic.operators_overview(),
         "log": logic.get_log(),
         "broker": _info["broker"],
         "uptime": int(time.time() - _info["started"]),
@@ -111,7 +112,11 @@ class Handler(BaseHTTPRequestHandler):
         if self.path in ("/", "/index.html"):
             self._send(200, PAGE.encode("utf-8"), "text/html; charset=utf-8")
         elif self.path == "/api/state":
-            self._json(200, _state())
+            try:
+                self._json(200, _state())
+            except Exception:
+                logic.log("ERROR en el panel (/api/state):\n" + traceback.format_exc())
+                self._json(500, {"error": "Error interno de CENTRAL (ver logs)"})
         else:
             self._json(404, {"error": "No encontrado"})
 
@@ -131,7 +136,11 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError
         except (ValueError, json.JSONDecodeError):
             return self._json(400, {"ok": False, "error": "Petición inválida"})
-        status, body = _run_command(cmd)
+        try:
+            status, body = _run_command(cmd)
+        except Exception:
+            logic.log("ERROR en el panel (/api/command):\n" + traceback.format_exc())
+            return self._json(500, {"ok": False, "error": "Error interno de CENTRAL (ver logs)"})
         self._json(status, body)
 
 
@@ -180,6 +189,9 @@ PAGE = r"""<!doctype html>
   .DESCONECTADA { background:#c4c9cf; }
   @keyframes blink { 50% { background:#b6f5c6; } }
   #log { margin:0 20px; height:230px; overflow:auto; padding:10px 12px; background:#0a1319; border:1px solid var(--line); border-radius:8px; font:12.5px/1.5 Consolas, monospace; white-space:pre-wrap; }
+  #ops td { color: var(--txt); }
+  #ops tr { border-top:1px solid var(--line); }
+  .on { color:#2ecc71; font-weight:600; }
   footer { padding:10px 20px 20px; font-size:12px; color:var(--muted); }
 </style>
 </head>
@@ -205,6 +217,14 @@ PAGE = r"""<!doctype html>
     <th style="text-align:right">Volumen (L)</th><th>Operario</th>
   </tr></thead>
   <tbody id="rows"></tbody>
+</table>
+</div>
+
+<h2>Operarios</h2>
+<div class="wrap">
+<table>
+  <thead><tr><th>ID</th><th>Nombre</th><th>Tipo</th><th>Estado</th></tr></thead>
+  <tbody id="ops"></tbody>
 </table>
 </div>
 
@@ -256,6 +276,20 @@ function render(d) {
   }
   document.getElementById("sel").textContent =
     selected ? "Seleccionada: " + selected : "Ninguna estación seleccionada";
+
+  // Operarios (los de la BD más los internos del sistema)
+  const ops = document.getElementById("ops");
+  ops.replaceChildren();
+  for (const o of d.operators) {
+    const tr = document.createElement("tr");
+    const busy = o.watering_at.length > 0;
+    tr.appendChild(cell(o.id));
+    tr.appendChild(cell(o.name || "—"));
+    tr.appendChild(cell(o.system ? "Sistema" : "Operario"));
+    tr.appendChild(cell(busy ? "Regando en " + o.watering_at.join(", ") : "Libre",
+                        busy ? "on" : ""));
+    ops.appendChild(tr);
+  }
 
   // Mensajes: si estabas leyendo el final, seguimos bajando con los nuevos
   const log = document.getElementById("log");
