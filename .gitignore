@@ -434,3 +434,4 @@ __pycache__/
 .venv/
 *.db
 .env
+test*.py

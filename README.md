@@ -1,6 +1,6 @@
 # Water Management Network
-## SISTEMAS DISTRIBUIDOS
-> Práctica no guiada: Sockets, Streaming de Eventos, Colas y modularidad.
+
+**Sistemas Distribuidos:** Práctica no guiada de Sockets, Streaming de Eventos, Colas y modularidad. Herramientas usadas: Docker Desktop, Apache Kafka, Railway y Python.
 
 
 # Información Despliegue
