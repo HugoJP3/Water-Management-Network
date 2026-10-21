@@ -3,7 +3,6 @@ import sqlite3
 from contextlib import contextmanager
 
 # Ruta de la BD. En local usa un fichero junto al código;
-# más adelante podrá cambiarse con una variable de entorno (Railway).
 DB_PATH = os.environ.get("WM_DB_PATH", "wm_central.db")
 
 # Estados que ve el panel
