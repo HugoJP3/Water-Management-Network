@@ -149,7 +149,7 @@ def start(port: int, broker=None):
     _info["broker"] = broker
     server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
-    logic.log(f"Panel web en http://localhost:{port}"
+    logic.log(f"Panel web en http://IP_PUBLICA:{port}"
               + (" (protegido con contraseña)" if os.environ.get("PANEL_PASSWORD") else
                  " (SIN contraseña: define PANEL_PASSWORD en producción)"))
     return server

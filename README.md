@@ -13,6 +13,16 @@
 | Central, dentro de Docker             | broker:29092       |
 | Monitor, Engine y FO, fuera de Docker | localhost:9092       |
 
+---
+### AWS EC2
+
+Modificar .env para tomar nueva IP. En la terminal de la máquina:
+```
+echo "EC2_PUBLIC_IP=$(curl -s ifconfig.me)" > .env 
+```
+
+---
+
 
 ---
 ### Lanzar Docker
