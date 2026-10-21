@@ -44,7 +44,8 @@ services:
     environment:
       TZ: "Europe/Madrid"
       WM_DB_PATH: /data/wm_central.db
-      PANEL_PASSWORD: "${PANEL_PASSWORD:-}" # Futura contraseña del panel web (si no se define, no hay contraseña)
+      PANEL_PASSWORD: "${PANEL_PASSWORD:?Define PANEL_PASSWORD en .env}" # Futura contraseña del panel web (si no se define, no hay contraseña)
+      PANEL_USER: "${PANEL_USER:-admin}" # Usuario del panel web (por defecto admin)
     volumes:
       - central-data:/data       # la BD SQLite sobrevive a reinicios
     restart: unless-stopped
