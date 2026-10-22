@@ -46,6 +46,7 @@ services:
       PANEL_USER: "${PANEL_USER:-admin}" # Usuario del panel web (por defecto admin)
     volumes:
       - central-data:/data       # la BD SQLite sobrevive a reinicios
+      - ./WM_Central/operators.txt:/app/operators.txt:ro # lista de operadores
     restart: unless-stopped
 
 
