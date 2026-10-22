@@ -62,9 +62,22 @@ def init_db():
 # ---------------------------------------------------------------- operarios
 def add_operator(operator_id, name=None):
     with _conn() as c:
-        c.execute("INSERT OR IGNORE INTO operator (id, name) VALUES (?, ?)",
+        c.execute("""INSERT INTO operator (id, name) VALUES (?, ?)"
+                        ON CONFLICT(id) DO UPDATE SET name = excluded.name""",
                   (operator_id, name))
 
+def sync_operators(operators):
+    """operators: lista de (id, nombre). Deja la tabla igual que el fichero:
+    añade los nuevos, actualiza nombres y borra los que ya no están."""
+    ids = [op_id for op_id, _ in operators]
+    if not ids:                      # un fichero vacío no debe vaciar la tabla
+        return
+    with _conn() as c:
+        c.executemany("""INSERT INTO operator (id, name) VALUES (?, ?)
+                            ON CONFLICT(id) DO UPDATE SET name = excluded.name""",
+                      operators)
+        marcas = ",".join("?" * len(ids))
+        c.execute(f"DELETE FROM operator WHERE id NOT IN ({marcas})", ids)
 
 def operator_exists(operator_id) -> bool:
     with _conn() as c:

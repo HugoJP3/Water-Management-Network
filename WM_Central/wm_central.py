@@ -156,16 +156,17 @@ def load_operators(path: str = "operators.txt"):
         for i in range(1, 21):
             db.add_operator(f"FO-{i:02d}")
         return
-    count = 0
+    
+    operators = []
     with open(path, encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
             op_id, _, name = line.partition(",")
-            db.add_operator(op_id.strip(), name.strip() or None)
-            count += 1
-    log(f"{count} operarios cargados desde {path}")
+            operators.append((op_id.strip(), name.strip() or None))
+    db.sync_operators(operators)
+    log(f"{len(operators)} operarios sincronizados desde {path}")
 
 
 def main():
