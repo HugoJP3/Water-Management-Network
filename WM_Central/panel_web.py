@@ -161,55 +161,133 @@ PAGE = r"""<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>WM_Central · Panel de riego</title>
+<title>WM_Central · Panel de Riego</title>
 <style>
-  :root { --bg:#0f1b24; --panel:#16262f; --txt:#e8eef2; --muted:#8aa0ad; --line:#26404d; }
+  :root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --panel-border: #334155;
+    --txt: #f8fafc;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+  }
   * { box-sizing: border-box; }
-  body { margin:0; font-family: system-ui, Segoe UI, Arial, sans-serif; background:var(--bg); color:var(--txt); }
-  header { display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; padding:14px 20px; border-bottom:1px solid var(--line); }
-  h1 { margin:0; font-size:20px; font-weight:600; } h1 span { color:var(--muted); font-weight:400; }
-  h2 { margin:18px 20px 8px; font-size:13px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); }
+  body { margin:0; font-family: system-ui, -apple-system, sans-serif; background:var(--bg); color:var(--txt); }
+  
+  header { display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; padding:16px 24px; background:var(--panel); border-bottom:1px solid var(--panel-border); }
+  h1 { margin:0; font-size:20px; font-weight:700; display:flex; align-items:center; gap:10px; } 
+  h1 span { color:var(--muted); font-weight:400; font-size:15px; }
+  
+  .live-tag { display:inline-flex; align-items:center; gap:6px; background:#065f46; color:#34d399; font-size:12px; font-weight:600; padding:3px 10px; border-radius:99px; }
+  .dot { width:8px; height:8px; background:#34d399; border-radius:50%; animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0% { opacity:1; transform:scale(1); } 50% { opacity:0.4; transform:scale(1.2); } 100% { opacity:1; transform:scale(1); } }
+
+  /* Grid de KPIs */
+  .kpi-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:16px; margin:20px; }
+  .kpi-card { background:var(--panel); border:1px solid var(--panel-border); border-radius:10px; padding:16px; }
+  .kpi-title { font-size:12px; text-transform:uppercase; color:var(--muted); letter-spacing:0.05em; font-weight:600; }
+  .kpi-value { font-size:24px; font-weight:700; margin-top:6px; color:var(--accent); }
+
+  /* Filtros y Barra de Control */
+  .bar { display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin:0 20px 16px; justify-content:space-between; }
+  .bar-left, .bar-right { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  
+  input[type="text"], select { background:var(--panel); border:1px solid var(--panel-border); color:var(--txt); padding:8px 12px; border-radius:6px; font-size:14px; outline:none; }
+  input[type="text"]:focus { border-color:var(--accent); }
+  
+  button { background:var(--panel); color:var(--txt); border:1px solid var(--panel-border); padding:8px 14px; border-radius:6px; cursor:pointer; font-size:14px; font-weight:500; transition:all 0.2s; }
+  button:hover { background:#334155; border-color:var(--accent); }
+  button.primary { background:#0284c7; border-color:#0284c7; }
+  button.primary:hover { background:#0369a1; }
+  
+  /* Chips de Estado */
   #chips { display:flex; flex-wrap:wrap; gap:8px; }
-  .chip { padding:4px 10px; border-radius:999px; font-size:13px; color:#10202a; font-weight:600; }
-  .bar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; padding:12px 20px; }
-  button { background:var(--panel); color:var(--txt); border:1px solid var(--line); padding:8px 14px; border-radius:6px; cursor:pointer; font-size:14px; }
-  button:hover { border-color:#4a7a90; }
-  label { font-size:14px; color:var(--muted); } #sel { font-size:14px; color:var(--muted); }
-  .wrap { margin:0 20px; overflow-x:auto; border:1px solid var(--line); border-radius:8px; }
+  .chip { padding:4px 12px; border-radius:99px; font-size:12px; font-weight:600; color:#0f172a; cursor:pointer; opacity:0.8; transition:opacity 0.2s; }
+  .chip:hover, .chip.active { opacity:1; ring:2px solid #fff; }
+
+  /* Vistas: Tabla y Grid */
+  .wrap { margin:0 20px; border:1px solid var(--panel-border); border-radius:10px; overflow:hidden; background:var(--panel); }
   table { width:100%; border-collapse:collapse; font-size:14px; }
-  th { text-align:left; padding:9px 12px; background:var(--panel); color:var(--muted); font-weight:500; }
-  td { padding:9px 12px; color:#10202a; font-weight:500; }
+  th { text-align:left; padding:12px 16px; background:#0f172a; color:var(--muted); font-weight:600; font-size:13px; text-transform:uppercase; }
+  td { padding:12px 16px; color:#0f172a; font-weight:600; }
   td.num { text-align:right; font-variant-numeric: tabular-nums; }
-  tr.row { cursor:pointer; border-top:1px solid var(--line); }
+  tr.row { cursor:pointer; border-top:1px solid var(--panel-border); }
   tr.row.sel { outline:3px solid #ffffff; outline-offset:-3px; }
-  .DISPONIBLE { background:#7bd88f; }
-  .REGANDO { background:#2ecc71; animation: blink 1s steps(2, start) infinite; }
-  .FUGA { background:#ff6b6b; }
-  .FUERA_DE_SERVICIO { background:#ffb347; }
-  .DESCONECTADA { background:#c4c9cf; }
-  @keyframes blink { 50% { background:#b6f5c6; } }
-  #log { margin:0 20px; height:230px; overflow:auto; padding:10px 12px; background:#0a1319; border:1px solid var(--line); border-radius:8px; font:12.5px/1.5 Consolas, monospace; white-space:pre-wrap; }
+
+  .grid-view { display:grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap:16px; margin:0 20px; }
+  .ws-card { background:var(--panel); border:2px solid var(--panel-border); border-radius:10px; padding:16px; cursor:pointer; transition:transform 0.1s; }
+  .ws-card:hover { transform: translateY(-2px); }
+  .ws-card.sel { border-color:#ffffff !important; }
+  .ws-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+  .ws-id { font-weight:700; font-size:16px; color:var(--txt); }
+  .ws-badge { font-size:11px; padding:3px 8px; border-radius:6px; font-weight:700; color:#0f172a; }
+  .ws-body { font-size:13px; color:var(--muted); line-height:1.6; }
+  .ws-body strong { color:var(--txt); }
+
+  /* Colores de Estado */
+  .DISPONIBLE { background:#4ade80 !important; }
+  .REGANDO { background:#22c55e !important; animation: blink 1s steps(2, start) infinite; }
+  .FUGA { background:#f87171 !important; }
+  .FUERA_DE_SERVICIO { background:#fbbf24 !important; }
+  .DESCONECTADA { background:#94a3b8 !important; }
+  @keyframes blink { 50% { opacity:0.75; } }
+
+  h2 { margin:24px 20px 12px; font-size:14px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); }
+  #log { margin:0 20px 20px; height:200px; overflow:auto; padding:12px; background:#020617; border:1px solid var(--panel-border); border-radius:10px; font:12.5px/1.5 Consolas, monospace; color:#cbd5e1; white-space:pre-wrap; }
   #ops td { color: var(--txt); }
-  #ops tr { border-top:1px solid var(--line); }
-  .on { color:#2ecc71; font-weight:600; }
-  footer { padding:10px 20px 20px; font-size:12px; color:var(--muted); }
+  #ops tr { border-top:1px solid var(--panel-border); }
+  .on { color:#4ade80; font-weight:600; }
+
+  footer { padding:12px 20px 24px; font-size:12px; color:var(--muted); text-align:center; }
 </style>
 </head>
 <body>
+
 <header>
-  <h1>WaterManagement <span>· Panel de CENTRAL</span></h1>
-  <div id="chips"></div>
+  <h1>WaterManagement <span>· Panel de Control</span></h1>
+  <div class="live-tag"><div class="dot"></div> EN VIVO</div>
 </header>
 
-<div class="bar">
-  <button id="bStart">▶ Iniciar riego</button>
-  <button id="bBlock">⛔ Bloquear WS</button>
-  <button id="bAct">✔ Activar WS</button>
-  <label><input type="checkbox" id="all"> Aplicar a todas (ALL)</label>
-  <span id="sel">Ninguna estación seleccionada</span>
+<!-- KPIs Globales -->
+<div class="kpi-grid">
+  <div class="kpi-card">
+    <div class="kpi-title">Caudal Global</div>
+    <div class="kpi-value" id="kpiFlow">0.0 <span style="font-size:14px">L/min</span></div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-title">Agua Suministrada</div>
+    <div class="kpi-value" id="kpiVolume">0.0 <span style="font-size:14px">L</span></div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-title">Estaciones Activas</div>
+    <div class="kpi-value" id="kpiActive">0 / 0</div>
+  </div>
 </div>
 
-<div class="wrap">
+<!-- Filtros y Estado -->
+<div class="bar">
+  <div class="bar-left">
+    <div id="chips"></div>
+  </div>
+  <div class="bar-right">
+    <input type="text" id="search" placeholder="🔍 Buscar estación..." oninput="refreshUI()">
+    <button id="btnView" onclick="toggleView()">📱 Vista Tarjetas</button>
+  </div>
+</div>
+
+<!-- Acciones de Comando -->
+<div class="bar" style="background:var(--panel); padding:12px; border-radius:10px; border:1px solid var(--panel-border);">
+  <div class="bar-left">
+    <button class="primary" id="bStart">▶ Iniciar Riego</button>
+    <button id="bBlock" style="border-color:#f87171; color:#f87171;">⛔ Bloquear WS</button>
+    <button id="bAct" style="border-color:#4ade80; color:#4ade80;">✔ Activar WS</button>
+    <label style="font-size:14px; color:var(--muted); cursor:pointer;"><input type="checkbox" id="all"> Aplicar a todas (ALL)</label>
+  </div>
+  <div id="sel" style="font-size:14px; font-weight:600; color:var(--accent);">Ninguna estación seleccionada</div>
+</div>
+
+<!-- Vista Tabla -->
+<div class="wrap" id="tableView">
 <table>
   <thead><tr>
     <th>ID</th><th>Ubicación</th><th>Estado</th>
@@ -220,6 +298,9 @@ PAGE = r"""<!doctype html>
 </table>
 </div>
 
+<!-- Vista Grid (Tarjetas) -->
+<div class="grid-view" id="gridView" style="display:none;"></div>
+
 <h2>Operarios</h2>
 <div class="wrap">
 <table>
@@ -228,40 +309,100 @@ PAGE = r"""<!doctype html>
 </table>
 </div>
 
-<h2>Mensajes de la aplicación</h2>
+<h2>Registro de Eventos (Logs)</h2>
 <pre id="log"></pre>
-<footer id="foot">Conectando…</footer>
+
+<footer id="foot">Conectando con CENTRAL...</footer>
 
 <script>
 const LABEL = { DISPONIBLE:"Disponible", REGANDO:"Regando", FUGA:"Fuga",
                 FUERA_DE_SERVICIO:"Fuera de Servicio", DESCONECTADA:"Desconectada" };
-const COLOR = { DISPONIBLE:"#7bd88f", REGANDO:"#2ecc71", FUGA:"#ff6b6b",
-                FUERA_DE_SERVICIO:"#ffb347", DESCONECTADA:"#c4c9cf" };
+const COLOR = { DISPONIBLE:"#4ade80", REGANDO:"#22c55e", FUGA:"#f87171",
+                FUERA_DE_SERVICIO:"#fbbf24", DESCONECTADA:"#94a3b8" };
+
 let selected = null;
+let currentData = null;
+let isGridView = false;
+let statusFilter = "ALL";
+
+function toggleView() {
+  isGridView = !isGridView;
+  document.getElementById("tableView").style.display = isGridView ? "none" : "block";
+  document.getElementById("gridView").style.display = isGridView ? "grid" : "none";
+  document.getElementById("btnView").textContent = isGridView ? "📋 Vista Tabla" : "📱 Vista Tarjetas";
+  render(currentData);
+}
+
+function formatUptime(secs) {
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  return `${h > 0 ? h + 'h ' : ''}${m}m ${s}s`;
+}
 
 function cell(text, cls) {
   const td = document.createElement("td");
-  td.textContent = text;            // textContent: nunca se interpreta como HTML
+  td.textContent = text;
   if (cls) td.className = cls;
   return td;
 }
 
 function render(d) {
-  // Contadores por estado
-  const chips = document.getElementById("chips");
-  chips.replaceChildren();
-  for (const st of Object.keys(LABEL)) {
-    const c = document.createElement("span");
-    c.className = "chip";
-    c.style.background = COLOR[st];
-    c.textContent = (d.summary[st] || 0) + " " + LABEL[st];
-    chips.appendChild(c);
+  if (!d) return;
+  currentData = d;
+
+  // Calculo de Métricas Globales
+  let totalFlow = 0;
+  let totalVolume = 0;
+  let onlineCount = 0;
+
+  for (const s of d.stations) {
+    if (s.status !== "DESCONECTADA") {
+      totalFlow += s.flow || 0;
+      totalVolume += s.volume || 0;
+      onlineCount++;
+    }
   }
 
-  // Tabla de estaciones
+  document.getElementById("kpiFlow").innerHTML = `${totalFlow.toFixed(1)} <span style="font-size:14px">L/min</span>`;
+  document.getElementById("kpiVolume").innerHTML = `${totalVolume.toFixed(1)} <span style="font-size:14px">L</span>`;
+  document.getElementById("kpiActive").textContent = `${onlineCount} / ${d.stations.length}`;
+
+  // Filtro por búsqueda de texto
+  const searchText = document.getElementById("search").value.toLowerCase();
+  const filteredStations = d.stations.filter(s => {
+    const matchesText = s.id.toLowerCase().includes(searchText) || s.location.toLowerCase().includes(searchText);
+    const matchesFilter = (statusFilter === "ALL") || (s.status === statusFilter);
+    return matchesText && matchesFilter;
+  });
+
+  // Renderizar Chips de Filtro
+  const chips = document.getElementById("chips");
+  chips.replaceChildren();
+
+  const allChip = document.createElement("span");
+  allChip.className = "chip" + (statusFilter === "ALL" ? " active" : "");
+  allChip.style.background = "#e2e8f0";
+  allChip.textContent = `Todas (${d.stations.length})`;
+  allChip.onclick = () => { statusFilter = "ALL"; render(d); };
+  chips.appendChild(allChip);
+
+  for (const st of Object.keys(LABEL)) {
+    const count = d.summary[st] || 0;
+    if (count > 0 || st === statusFilter) {
+      const c = document.createElement("span");
+      c.className = "chip" + (statusFilter === st ? " active" : "");
+      c.style.background = COLOR[st];
+      c.textContent = `${count} ${LABEL[st]}`;
+      c.onclick = () => { statusFilter = (statusFilter === st) ? "ALL" : st; render(d); };
+      chips.appendChild(c);
+    }
+  }
+
+  // Renderizar Tabla
   const tbody = document.getElementById("rows");
   tbody.replaceChildren();
-  for (const s of d.stations) {
+  for (const s of filteredStations) {
     const tr = document.createElement("tr");
     tr.className = "row " + s.status + (s.id === selected ? " sel" : "");
     tr.onclick = () => { selected = s.id; render(d); };
@@ -274,32 +415,57 @@ function render(d) {
     tr.appendChild(cell(s.operator || "—"));
     tbody.appendChild(tr);
   }
-  document.getElementById("sel").textContent =
-    selected ? "Seleccionada: " + selected : "Ninguna estación seleccionada";
 
-  // Operarios (los de la BD más los internos del sistema)
+  // Renderizar Tarjetas (Grid View)
+  const grid = document.getElementById("gridView");
+  grid.replaceChildren();
+  for (const s of filteredStations) {
+    const card = document.createElement("div");
+    card.className = "ws-card" + (s.id === selected ? " sel" : "");
+    card.onclick = () => { selected = s.id; render(d); };
+    
+    card.innerHTML = `
+      <div class="ws-header">
+        <span class="ws-id">${s.id}</span>
+        <span class="ws-badge ${s.status}">${LABEL[s.status] || s.status}</span>
+      </div>
+      <div class="ws-body">
+        📍 <strong>${s.location}</strong><br>
+        💧 Caudal: <strong>${s.status !== 'DESCONECTADA' ? s.flow.toFixed(1) + ' L/min' : '—'}</strong><br>
+        📊 Volumen: <strong>${s.status !== 'DESCONECTADA' ? s.volume.toFixed(1) + ' L' : '—'}</strong><br>
+        👤 Operario: <strong>${s.operator || '—'}</strong>
+      </div>
+    `;
+    grid.appendChild(card);
+  }
+
+  document.getElementById("sel").textContent = selected ? "Seleccionada: " + selected : "Ninguna estación seleccionada";
+
+  // Operarios
   const ops = document.getElementById("ops");
   ops.replaceChildren();
   for (const o of d.operators) {
     const tr = document.createElement("tr");
-    const busy = o.watering_at.length > 0;
+    const busy = o.watering_at && o.watering_at.length > 0;
     tr.appendChild(cell(o.id));
     tr.appendChild(cell(o.name || "—"));
     tr.appendChild(cell(o.system ? "Sistema" : "Operario"));
-    tr.appendChild(cell(busy ? "Regando en " + o.watering_at.join(", ") : "Libre",
-                        busy ? "on" : ""));
+    tr.appendChild(cell(busy ? "Regando en " + o.watering_at.join(", ") : "Libre", busy ? "on" : ""));
     ops.appendChild(tr);
   }
 
-  // Mensajes: si estabas leyendo el final, seguimos bajando con los nuevos
+  // Logs
   const log = document.getElementById("log");
   const atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 20;
   log.textContent = d.log.join("\n");
   if (atBottom) log.scrollTop = log.scrollHeight;
 
   document.getElementById("foot").textContent =
-    "Kafka: " + (d.broker || "sin broker") + " · CENTRAL activa desde hace " +
-    d.uptime + " s · " + d.stations.length + " estaciones registradas";
+    `Broker: ${d.broker || "sin broker"} · Uptime: ${formatUptime(d.uptime)} · ${d.stations.length} Estaciones registradas`;
+}
+
+function refreshUI() {
+  if (currentData) render(currentData);
 }
 
 async function refresh() {
