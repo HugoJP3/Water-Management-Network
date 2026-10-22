@@ -1,9 +1,11 @@
 # Water Management Network
 
-**Sistemas Distribuidos:** Práctica no guiada de Sockets, Streaming de Eventos, Colas y modularidad. Herramientas usadas: Docker Desktop, Apache Kafka, Railway y Python.
+**Sistemas Distribuidos:** Práctica no guiada de Sockets, Streaming de Eventos, Colas y modularidad. Herramientas usadas: Docker Desktop, Apache Kafka, AWS (EC2) y Python.
 
 
 # Información Despliegue
+
+> Nota: Los comandos están pensados para ejecución en Windows (salvo AWS EC2 y especificación puntual).
 
 ---
 ### Direcciones
@@ -11,14 +13,24 @@
 | Quién se conecta | Dirección |
 |--------------|--------------|
 | Central, dentro de Docker             | broker:29092       |
-| Monitor, Engine y FO, fuera de Docker | localhost:9092       |
+| Monitor, Engine y FO, fuera de Docker | <IP_PUBLICA>:9092       |
 
 ---
 ### AWS EC2
 
 Modificar .env para tomar nueva IP. En la terminal de la máquina:
+
 ```
-echo "EC2_PUBLIC_IP=$(curl -s ifconfig.me)" > .env 
+sed -i '/^EC2_PUBLIC_IP=/d' .env
+echo "EC2_PUBLIC_IP=$(curl -s ifconfig.me)" >> .env
+
+docker compose up -d # Recrea el broker con la nueva IP
+```
+
+Modificar .env para modificar la contraseña o el usuario:
+
+```
+nano .env # Desde aquí, edita PANEL_PASSWORD y PANEL_USER
 ```
 
 ---
@@ -43,17 +55,28 @@ docker compose logs -f central  # Ctrl+C para salir
 
 ```
 # Probar un operario
-docker run -it --rm --network water-management-network_default wm_fo broker:29092 FO-01
+docker run -it --rm wm_fo <IP_PUBLICA>:9092 FO-01
 ```
 
 ```
-# Probar un monitor en puerto local 6001
-docker run -it --rm --name ws_m1 --network water-management-network_default -p 6001:6001 wm_ws_m 6001 wm_central:5000 WS-01 Campello
-```
+# Despliegue de estaciones
+# > El puerto de la derecha del -p de Engine tiene que ser el mismo que el primer argumento del Monitor.
 
-```
-# Probar un engine conectado a ese monitor
-docker run -it --rm --network water-management-network_default wm_ws_e broker:29092 ws_m1:6001
+# Estación 1 en puerto local 6001
+docker run -it --rm --name ws_m1 -p 6001:6001 wm_ws_m 6001 <IP_PUBLICA>:5000 WS-01 Campello
+
+docker run -it --rm wm_ws_e <IP_PUBLICA>:9092 host.docker.internal:6001
+
+# Estación 2 en puerto local 6002
+docker run -it --rm --name ws_m2 -p 6002:6002 wm_ws_m 6002 <IP_PUBLICA>:5000 WS-02 Retiro
+
+docker run -it --rm wm_ws_e <IP_PUBLICA>:9092 host.docker.internal:6002
+
+# Estación 1 (Linux)
+docker run -it --rm --name ws_m1 -p 6001:6001 wm_ws_m 6001 <IP_PUBLICA>:5000 WS-01 Campello
+
+docker run -it --rm --add-host=host.docker.internal:host-gateway wm_ws_e <IP_PUBLICA>:9092 host.docker.internal:6001
+
 ```
 
 ```
@@ -66,9 +89,9 @@ docker load -i wm.tar
 
 ---
 ### Arrancar programas ( versión Local )
-Cómo arranzar los programas en local para pruebas, sin Docker (solo para central) y sin Railway
+Cómo arranzar los programas en local para pruebas, sin Docker (solo para central) y sin EC2.
 
-| Programa      | comando |
+| Programa      | comando (Windows PowerShell) |
 |-------------- |--------------|
 | **Central**       | Lanzar Docker (arriba) |
 | **Monitor**       | python .\WM_WS\WM_WS_M\wm_ws_m.py *puerto_monitor* localhost:5000 ID_ws *ubicacion*      |
@@ -92,10 +115,10 @@ FO-12,Operario 12
 Es necesario rehacer la imagen de Docker de central tras modificar operators.txt para que se apliquen los cambios.
 
 ---
-### requirements.txt
+### requests.txt
 Archivo en WM_FO pensado para ejecutar una serie de instrucciones sobre Water Stations sin necesidad de ejecutar manualmente todas ellas. Las instrucciones se ejecutan de forma secuencial dejando un margen de una a otra (margen de 4 segundos).
 
-Edita el archivo requirements.txt en WM_FO para añadir instrucciones. Por ejemplo:
+Edita el archivo requests.txt en WM_FO para añadir instrucciones. Por ejemplo:
 
 ```
 // estación#segundos
@@ -103,4 +126,4 @@ WS-01#10
 WS-02#5
 WS-01#8
 ```
-Para ejecutar requirements.txt es necesario logearse como Field Operator y seleccionar la opción 
+Para ejecutar requests.txt es necesario logearse como Field Operator y seleccionar la opción 2 (Ejecutar fichero de peticiones).
