@@ -194,7 +194,7 @@ class Engine:
         
         # Respuesta de CENTRAL a peticiones de riego manual: NOTIFY#MANUAL#WS-01#OK
         if (campos[0] in ("NOTIFY", "REPLY", "SUMMARY") and len(campos) > 3
-            and campos[1] == "MANUAL" and campos[2] == self.ws_id):
+            and campos[1] == "ENGINE" and campos[2] == self.ws_id):
             if campos[0] == "NOTIFY" and len(campos) > 3:
                 log("CENTRAL: " + campos[3])
             elif campos[0] == "REPLY" and len(campos) > 3:
