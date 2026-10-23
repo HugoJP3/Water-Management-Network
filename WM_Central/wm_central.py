@@ -86,6 +86,13 @@ def handle_monitor(conn: socket.socket, addr):
             return
         _, ws_id, location = fields
 
+        # 2b) Validar que la estación esté registrada / autorizada en CENTRAL
+        if not is_authorized_station(ws_id):
+            proto.send_message(conn, proto.pack(
+                "ACK_REGISTER", "KO", "Estación no registrada o no autorizada en CENTRAL"))
+            log(f"{addr} -> Registro RECHAZADO para estación no autorizada: {ws_id}")
+            return
+
         # 3) Si ya había una conexión de esa estación, la nueva la sustituye
         with _active_lock:
             old = _active.get(ws_id)
@@ -147,6 +154,34 @@ def housekeeping(stop_event: threading.Event):
 
 
 # ------------------------------------------------------------------- arranque
+_authorized_stations = set()
+
+def load_authorized_stations(path: str = "stations.txt"):
+    """Carga estaciones autorizadas desde fichero si existe, o preconfigura WS-01..WS-20."""
+    global _authorized_stations
+    _authorized_stations = set()
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                ws_id, _, _ = line.partition(",")
+                _authorized_stations.add(ws_id.strip())
+        log(f"{len(_authorized_stations)} estaciones autorizadas cargadas desde {path}")
+    else:
+        # Por defecto se autorizan WS-01 hasta WS-20
+        _authorized_stations = {f"WS-{i:02d}" for i in range(1, 21)}
+
+def is_authorized_station(ws_id: str) -> bool:
+    import re
+    if ws_id in _authorized_stations:
+        return True
+    # Si stations.txt no existe o solo hay algunas, aceptar formato estándar WS-01..WS-20
+    if re.match(r"^WS-(0[1-9]|1[0-9]|20)$", ws_id):
+        return True
+    return False
+
 def load_operators(path: str = "operators.txt"):
     """Da de alta los operarios desde un fichero de texto (una línea por
     operario: 'FO-01' o 'FO-01,Nombre'; las líneas con # se ignoran).
@@ -185,6 +220,7 @@ def main():
     # Al arrancar: crear tablas y dejar todas las estaciones DESCONECTADAS
     db.init_db()
     load_operators()
+    load_authorized_stations()
     log(f"Estaciones conocidas: {[(s['id'], s['status']) for s in db.list_stations()]}")
 
     stop_event = threading.Event()
@@ -192,6 +228,7 @@ def main():
     # Kafka (import tardío: así Central también arranca sin confluent-kafka
     # instalado cuando se ejecuta en modo solo sockets)
     kafka_io = None
+    consumer_thread = None
     if args.broker:
         import kafka_io
         kafka_io.connect(args.broker)

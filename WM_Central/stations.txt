@@ -1,0 +1,11 @@
+# Estaciones autorizadas en CENTRAL (ID o ID,Ubicacion)
+WS-01,Campello
+WS-02,Retiro
+WS-03,San Juan
+WS-04,Postiguet
+WS-05,Canalejas
+WS-06,Canalejas
+WS-07,Canalejas
+WS-08,Canalejas
+WS-09,Canalejas
+WS-10,Canalejas

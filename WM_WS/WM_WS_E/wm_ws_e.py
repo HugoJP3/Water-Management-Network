@@ -124,6 +124,7 @@ class Engine:
 
         # Estado compartido entre hilos. SIEMPRE se toca con self.lock.
         self.lock = threading.RLock()
+        self.monitor_conectado = False  # True cuando el socket con el Monitor está activo
         self.averia = False       # avería simulada (tecla)
         self.bloqueada = False    # puesta fuera de servicio por CENTRAL
         self.riego = None         # None, o dict con los datos del riego en curso
@@ -131,6 +132,8 @@ class Engine:
     # ------------------------------------------------------------- estado
     def estado(self):
         with self.lock:
+            if not self.monitor_conectado:
+                return "AVERIADA (Monitor desconectado)"
             if self.averia:
                 return "FUGA"
             if self.bloqueada:
@@ -148,6 +151,8 @@ class Engine:
     def iniciar_riego(self, operario, segundos):
         """Devuelve (True, "") o (False, motivo del rechazo)."""
         with self.lock:
+            if not self.monitor_conectado:
+                return False, "la estación está averiada (Monitor desconectado)"
             if self.averia:
                 return False, "la estación tiene una avería"
             if self.bloqueada:
@@ -258,6 +263,8 @@ class Engine:
                 self.ws_id = campos[1]
                 protocol.send_message(sock, "OK")
                 self.id_listo.set()
+                with self.lock:
+                    self.monitor_conectado = True
                 log(f"Conectado al Monitor. Soy la estación {self.ws_id}")
                 avisado = False
 
@@ -269,8 +276,10 @@ class Engine:
                     else:
                         log(f"Mensaje inesperado del Monitor: {mensaje}")
             except ERRORES_RED as e:
+                with self.lock:
+                    self.monitor_conectado = False
                 if not avisado:
-                    log(f"Sin conexión con el Monitor ({e}). Reintentando...")
+                    log(f"Sin conexión con el Monitor ({e}). Estación AVERIADA. Reintentando...")
                     avisado = True
                 if sock is not None:
                     sock.close()
@@ -319,16 +328,24 @@ class Engine:
                 return
 
             if opcion == "1":
+                with self.lock:
+                    mon_ok = self.monitor_conectado
+                if not mon_ok:
+                    print("No se puede regar: Estación AVERIADA (Monitor desconectado)")
+                    continue
                 dato = input(f"Duración en segundos [{DURACION_MANUAL}]: ").strip()
                 try:
                     segundos = int(dato) if dato else DURACION_MANUAL
+                    if segundos <= 0:
+                        print("El tiempo debe ser mayor que 0")
+                        continue
                 except ValueError:
                     print("Número no válido")
                     continue
-                ok, motivo = self.bus.publish(TOPIC_PETICIONES, protocol.pack("REQUEST", "ENGINE", self.ws_id, segundos))
-                log(f"Solicitud de riego manual enviada a CENTRAL ({segundos} s)")
+                # Riego manual autónomo: la estación opera sobre sí misma sin esperar a Central
+                ok, motivo = self.iniciar_riego("MANUAL", segundos)
                 if not ok:
-                    print(f"No se puede regar: {motivo} (¿Kafka caído?)")
+                    print(f"No se puede regar: {motivo}")
 
             elif opcion == "2":
                 if not self.terminar_riego("ENGINE"):

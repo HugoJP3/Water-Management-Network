@@ -47,6 +47,7 @@ services:
     volumes:
       - central-data:/data       # la BD SQLite sobrevive a reinicios
       - ./WM_Central/operators.txt:/app/operators.txt:ro # lista de operadores
+      - ./WM_Central/stations.txt:/app/stations.txt:ro # lista de estaciones autorizadas
     restart: unless-stopped
 
 

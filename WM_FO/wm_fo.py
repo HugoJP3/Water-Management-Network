@@ -122,6 +122,7 @@ class FieldOperator:
         self.cond = threading.Condition()
         self.peticion = None      # petición en curso (dict) o None
         self.estaciones = {}      # ws_id -> (estado, ubicación), del tema ws-status
+        self.ultimo_resumen = None
 
     # ------------------------------------------- mensajes que llegan por Kafka
     def procesar_mensaje(self, tema, texto):
@@ -172,7 +173,10 @@ class FieldOperator:
             litros = campos[3] if len(campos) > 3 else "?"
             segundos = campos[4] if len(campos) > 4 else "?"
             motivo = campos[5] if len(campos) > 5 else "?"
-            log(f"[{ws}] RESUMEN FINAL: {litros} L en {segundos} s (motivo: {motivo})")
+            texto_resumen = f"[{ws}] RESUMEN FINAL: {litros} L en {segundos} s (motivo: {motivo})"
+            log(texto_resumen)
+            with self.cond:
+                self.ultimo_resumen = texto_resumen
             self._terminar_peticion(ws, True, f"{litros} L en {segundos} s")
 
     def _terminar_peticion(self, ws, exito, detalle):
@@ -211,6 +215,10 @@ class FieldOperator:
             self.peticion = None
         log(f"Petición a {ws} terminada: {'ÉXITO' if exito else 'FALLO'} ({detalle})")
         return exito
+
+    def consultar_ultimo_servicio(self):
+        log("Consultando a CENTRAL el resultado del último servicio...")
+        self.bus.publish(TOPIC_PETICIONES, f"LAST_SERVICE#{self.id}")
 
     # --------------------------------------------------------------- fichero
     def leer_fichero(self, ruta):
@@ -268,6 +276,7 @@ class FieldOperator:
         ayuda = ("\n  [1] Pedir riego a una estación\n"
                  "  [2] Ejecutar fichero de peticiones\n"
                  "  [3] Ver estaciones\n"
+                 "  [4] Ver último resultado de servicio\n"
                  "  [h] Ayuda    [0] Salir")
         print(ayuda)
         while True:
@@ -293,6 +302,15 @@ class FieldOperator:
                 self.ejecutar_fichero(ruta)
             elif opcion == "3":
                 self.mostrar_estaciones()
+            elif opcion == "4":
+                self.consultar_ultimo_servicio()
+                time.sleep(0.6)
+                with self.cond:
+                    res = self.ultimo_resumen
+                if res:
+                    print(f"\n  {res}")
+                else:
+                    print("\n  No hay resultados de servicios previos.")
             elif opcion == "h":
                 print(ayuda)
             elif opcion == "0":
@@ -306,6 +324,8 @@ class FieldOperator:
         threading.Thread(target=self.bus.escuchar, args=(self.procesar_mensaje,),
                          daemon=True).start()
         log(f"Operario {self.id} listo")
+        time.sleep(0.5)
+        self.consultar_ultimo_servicio()
         if fichero:
             self.ejecutar_fichero(fichero)
         self.menu()

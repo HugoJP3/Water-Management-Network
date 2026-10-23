@@ -54,6 +54,15 @@ def init_db():
                 name TEXT
             )""")
         c.execute("""
+            CREATE TABLE IF NOT EXISTS operator_summary (
+                operator_id TEXT PRIMARY KEY,
+                ws_id       TEXT NOT NULL,
+                volume      REAL NOT NULL,
+                duration    INTEGER NOT NULL,
+                reason      TEXT NOT NULL,
+                timestamp   TEXT NOT NULL
+            )""")
+        c.execute("""
             UPDATE watering_station
             SET connected = 0, watering = 0, flow = 0, operator_id = NULL
         """)
@@ -246,3 +255,25 @@ def list_stations():
         d["status"] = _derive_status(row)
         result.append(d)
     return result
+
+def save_operator_summary(operator_id, ws_id, volume, duration, reason):
+    """Guarda el último resumen de servicio de un operario para que sobreviva caídas."""
+    with _conn() as c:
+        c.execute("""
+            INSERT INTO operator_summary (operator_id, ws_id, volume, duration, reason, timestamp)
+            VALUES (?, ?, ?, ?, ?, datetime('now'))
+            ON CONFLICT(operator_id) DO UPDATE SET
+                ws_id = excluded.ws_id,
+                volume = excluded.volume,
+                duration = excluded.duration,
+                reason = excluded.reason,
+                timestamp = excluded.timestamp
+        """, (operator_id, ws_id, volume, duration, reason))
+
+
+def get_operator_summary(operator_id):
+    """Devuelve el último resumen de un operario o None si no hay ninguno."""
+    with _conn() as c:
+        row = c.execute("SELECT * FROM operator_summary WHERE operator_id = ?",
+                        (operator_id,)).fetchone()
+        return dict(row) if row else None

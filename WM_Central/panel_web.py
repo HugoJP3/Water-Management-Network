@@ -316,7 +316,7 @@ PAGE = r"""<!doctype html>
 
 <script>
 const LABEL = { DISPONIBLE:"Disponible", REGANDO:"Regando", FUGA:"Fuga",
-                FUERA_DE_SERVICIO:"Fuera de Servicio", DESCONECTADA:"Desconectada" };
+                FUERA_DE_SERVICIO:"Out of Service", DESCONECTADA:"Desconectada" };
 const COLOR = { DISPONIBLE:"#4ade80", REGANDO:"#22c55e", FUGA:"#f87171",
                 FUERA_DE_SERVICIO:"#fbbf24", DESCONECTADA:"#94a3b8" };
 

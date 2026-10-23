@@ -96,6 +96,7 @@ def send(topic: str, message: str):
 # operators.txt queda solo para los operarios reales que da de alta el admin.
 INTERNAL_OPERATORS = {
     "ENGINE": "Admin: Riego manual desde la estación",
+    "MANUAL": "Operario: Riego manual en la estación",
     "CENTRAL": "Admin: Riego iniciado desde central",
 }
 
@@ -168,6 +169,7 @@ def abort_session(ws_id: str, motivo: str, send_stop: bool = True) -> bool:
     if send_stop:
         send(T_WS_COMMANDS, proto.pack("STOP", ws_id))
     op = s["operator"]
+    db.save_operator_summary(op, ws_id, float(litros), int(segundos), str(motivo))
     notify(op, ws_id, f"Riego interrumpido: {motivo}")
     send(T_FO_NOTIFICATIONS,
          proto.pack("SUMMARY", op, ws_id, litros, segundos, motivo))
@@ -189,7 +191,19 @@ def check_stalled(now=None):
 
 # ---------------------------------------------------- mensajes de Kafka
 def handle_request(fields):
-    """fo-requests: REQUEST#operario#estacion#segundos."""
+    """fo-requests: REQUEST#operario#estacion#segundos o LAST_SERVICE#operario."""
+    if fields and fields[0] == "LAST_SERVICE" and len(fields) >= 2:
+        op = fields[1]
+        res = db.get_operator_summary(op)
+        if res:
+            log(f"Enviando último resumen de servicio a {op}: {res['volume']} L en {res['duration']} s")
+            send(T_FO_NOTIFICATIONS,
+                 proto.pack("SUMMARY", op, res["ws_id"], res["volume"], res["duration"], res["reason"]))
+        else:
+            send(T_FO_NOTIFICATIONS,
+                 proto.pack("NOTIFY", op, "NONE", "No hay servicios previos registrados"))
+        return
+
     if len(fields) != 4 or fields[0] != "REQUEST":
         log(f"Petición mal formada ignorada: {fields}")
         return
@@ -238,24 +252,31 @@ def handle_telemetry(fields):
             return
         with _lock:
             s = _sessions.get(ws_id)
-            if s is not None:
+            if s is None:
+                # La estación inició el riego de forma autónoma/manual
+                op_name = _op or "MANUAL"
+                _sessions[ws_id] = {"operator": op_name, "start": time.time(), "last_tele": time.time()}
+                s = _sessions[ws_id]
+                db.start_watering(ws_id, op_name)
+                log(f"{ws_id} -> Riego autónomo/manual detectado (Operario: {op_name})")
+            else:
                 s["last_tele"] = time.time()
-        if s is None:
-            return      # telemetría rezagada de un riego que ya cerramos
         db.update_telemetry(ws_id, flow, volume)
 
     elif kind == "END_WATERING" and len(fields) == 5:
         _, ws_id, litros, segundos, motivo = fields
         with _lock:
             s = _sessions.pop(ws_id, None)
-        if s is None:
-            log(f"{ws_id} -> END_WATERING ignorado (no había riego en curso)")
-            return
         db.end_watering(ws_id)
-        op = s["operator"]
+        op = s["operator"] if s else "MANUAL"
+        try:
+            db.save_operator_summary(op, ws_id, float(litros), int(segundos), str(motivo))
+        except Exception as e:
+            log(f"Error guardando resumen de {op}: {e}")
         log(f"{ws_id} -> riego terminado ({motivo}): {litros} L en {segundos} s")
-        send(T_FO_NOTIFICATIONS,
-             proto.pack("SUMMARY", op, ws_id, litros, segundos, motivo))
+        if op not in ("MANUAL", "ENGINE", "CENTRAL"):
+            send(T_FO_NOTIFICATIONS,
+                 proto.pack("SUMMARY", op, ws_id, litros, segundos, motivo))
 
     else:
         log(f"Mensaje de telemetría no reconocido: {fields}")

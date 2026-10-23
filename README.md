@@ -13,6 +13,7 @@ Siguiendo la normativa de la asignatura, el historial de consultas y apoyos de I
     [1] Pedir riego a una estación
     [2] Ejecutar fichero de peticiones
     [3] Ver estaciones
+    [4] Ver último resultado de servicio
     [h] Ayuda    [0] Salir
 
 > 1. Pedir riego a una estación indicando el tiempo en segundos de riego y el identificador de la estación.
