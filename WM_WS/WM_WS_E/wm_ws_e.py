@@ -192,7 +192,7 @@ class Engine:
         (con ALL en lugar del id, va dirigido a todas las estaciones)."""
         campos = protocol.unpack(texto)
         
-        # Respuesta de CENTRAL a peticiones de riego manual: NOTIFY#MANUAL#WS-01#OK
+        # Respuesta de CENTRAL a peticiones de riego manual: NOTIFY#ENGINE#WS-01#OK
         if (campos[0] in ("NOTIFY", "REPLY", "SUMMARY") and len(campos) > 3
             and campos[1] == "ENGINE" and campos[2] == self.ws_id):
             if campos[0] == "NOTIFY" and len(campos) > 3:
@@ -325,13 +325,13 @@ class Engine:
                 except ValueError:
                     print("Número no válido")
                     continue
-                ok, motivo = self.bus.publish(TOPIC_PETICIONES, protocol.pack("REQUEST", "MANUAL", self.ws_id, segundos))
+                ok, motivo = self.bus.publish(TOPIC_PETICIONES, protocol.pack("REQUEST", "ENGINE", self.ws_id, segundos))
                 log(f"Solicitud de riego manual enviada a CENTRAL ({segundos} s)")
                 if not ok:
                     print(f"No se puede regar: {motivo} (¿Kafka caído?)")
 
             elif opcion == "2":
-                if not self.terminar_riego("MANUAL"):
+                if not self.terminar_riego("ENGINE"):
                     print("No hay ningún riego en curso")
             elif opcion == "3":
                 self.alternar_averia()

@@ -7,7 +7,6 @@ services:
     ports:
       - 9092:9092
     environment:
-      KAFKA_HEAP_OPTS: "-Xms256m -Xmx384m"
       KAFKA_BROKER_ID: 1
       KAFKA_NODE_ID: 1
 
