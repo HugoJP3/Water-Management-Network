@@ -108,15 +108,15 @@ El script `lanzar` gestiona automáticamente la detección de puertos libres (`6
 ### Comandos Frecuentes
 | Comando | Descripción |
 |---|---|
-| `.\lanzar.bat 10 fo` | Lanza 10 Field Operators (`FO-01` a `FO-10`) |
-| `.\lanzar.bat fo FO-12 peticiones/prueba1.txt` | Lanza un Field Operator con ID `FO-12` y ejecuta el archivo peticiones/prueba1.txt buscado desde el path actual |
-| `.\lanzar.bat 5 WS` | Lanza 5 Estaciones completas (10 terminales: 5 Monitores + 5 Engines) |
-| `.\lanzar.bat WS Campello` | Lanza 1 WS completa asignando la ubicación "Campello" |
-| `.\lanzar.bat WS WS-02 Campello` | Lanza 1 WS completa con ID `WS-02` |
-| `.\lanzar.bat 2 monitor` | Lanza solo la parte Monitor de 2 estaciones |
-| `.\lanzar.bat 2 engine` | Lanza solo la parte Engine (se asocia automáticamente a monitores libres) |
-| `.\lanzar.bat status` | Muestra el estado de las instancias activas en el equipo |
-| `.\lanzar.bat clean` | Detiene y elimina todos los contenedores de prueba activos |
+| `.\Lanzar\lanzar.bat 10 fo` | Lanza 10 Field Operators (`FO-01` a `FO-10`) |
+| `.\Lanzar\lanzar.bat fo FO-12 peticiones/prueba1.txt` | Lanza un Field Operator con ID `FO-12` y ejecuta el archivo peticiones/prueba1.txt buscado desde el path actual |
+| `.\Lanzar\lanzar.bat 5 WS` | Lanza 5 Estaciones completas (10 terminales: 5 Monitores + 5 Engines) |
+| `.\Lanzar\lanzar.bat WS Campello` | Lanza 1 WS completa asignando la ubicación "Campello" |
+| `.\Lanzar\lanzar.bat WS WS-02 Campello` | Lanza 1 WS completa con ID `WS-02` |
+| `.\Lanzar\lanzar.bat 2 monitor` | Lanza solo la parte Monitor de 2 estaciones |
+| `.\Lanzar\lanzar.bat 2 engine` | Lanza solo la parte Engine (se asocia automáticamente a monitores libres) |
+| `.\Lanzar\lanzar.bat status` | Muestra el estado de las instancias activas en el equipo |
+| `.\Lanzar\lanzar.bat clean` | Detiene y elimina todos los contenedores de prueba activos |
 
 ---
 
