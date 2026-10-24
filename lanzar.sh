@@ -111,33 +111,45 @@ fi
 
 CANTIDAD=""
 TIPO=""
+TARGET_ID=""
 EXTRA=""
+TIPOS_VALIDOS="fo operario ws estacion engine e monitor m"
 
 for arg in "$@"; do
+    arg_lower=$(echo "$arg" | tr '[:upper:]' '[:lower:]')
     if [[ "$arg" =~ ^[0-9]+$ ]] && [ -z "$CANTIDAD" ]; then
         CANTIDAD="$arg"
-    elif [ -z "$TIPO" ]; then
-        TIPO="$arg"
+    elif [ -z "$TIPO" ] && echo "$TIPOS_VALIDOS" | grep -qw "$arg_lower"; then
+        TIPO="$arg_lower"
+    elif [ -z "$TARGET_ID" ] && [[ "$arg" =~ ^(FO|WS|fo|ws)-[0-9]+$ ]]; then
+        TARGET_ID=$(echo "$arg" | tr '[:lower:]' '[:upper:]')
     else
         if [ -z "$EXTRA" ]; then EXTRA="$arg"; else EXTRA="$EXTRA $arg"; fi
     fi
 done
 
 CANTIDAD="${CANTIDAD:-1}"
-TIPO=$(echo "$TIPO" | tr '[:upper:]' '[:lower:]')
 
 ACTIVOS=$(obtener_activos)
 
 case "$TIPO" in
     fo|operario)
-        asignados=()
-        for ((i=1; i<=100; i++)); do
-            cname=$(printf "fo_%02d" "$i")
-            if ! echo "$ACTIVOS" | grep -q -w "$cname"; then
-                asignados+=("$i")
-                if [ ${#asignados[@]} -ge "$CANTIDAD" ]; then break; fi
-            fi
-        done
+        if [ -n "$TARGET_ID" ]; then
+            num=$(echo "$TARGET_ID" | sed 's/[^0-9]//g' | sed 's/^0*//')
+            [ -z "$num" ] && num=1
+            asignados=("$num")
+            echo "ID especificado: $TARGET_ID"
+        else
+            asignados=()
+            for ((i=1; i<=100; i++)); do
+                cname=$(printf "fo_%02d" "$i")
+                if ! echo "$ACTIVOS" | grep -q -w "$cname"; then
+                    asignados+=("$i")
+                    if [ ${#asignados[@]} -ge "$CANTIDAD" ]; then break; fi
+                fi
+            done
+            echo "Lanzando $CANTIDAD FO(s) con IDs libres..."
+        fi
 
         PETICIONES_DIR="$DIR/peticiones"
         REQUESTS_DIR="$DIR/requests"
@@ -149,7 +161,6 @@ case "$TIPO" in
         [ -d "$REQUESTS_DIR" ] && VOLS="$VOLS -v \"$REQUESTS_DIR:/app/requests\""
         [ -f "$REQUESTS_FILE" ] && VOLS="$VOLS -v \"$REQUESTS_FILE:/app/requests.txt\""
 
-        echo "Lanzando $CANTIDAD FO(s) con IDs libres..."
         for num in "${asignados[@]}"; do
             FO_ID=$(printf "FO-%02d" "$num")
             CONT_NAME=$(printf "fo_%02d" "$num")
@@ -164,27 +175,34 @@ case "$TIPO" in
         ;;
 
     ws|estacion)
-        asignados=()
-        for ((i=1; i<=100; i++)); do
-            mname=$(printf "ws_m_%02d" "$i")
-            ename=$(printf "ws_e_%02d" "$i")
-            puerto=$((PUERTO_BASE_WS + i))
-            if ! echo "$ACTIVOS" | grep -q -w "$mname" && ! echo "$ACTIVOS" | grep -q -w "$ename"; then
-                if ! test_puerto "$puerto"; then
-                    asignados+=("$i")
-                    if [ ${#asignados[@]} -ge "$CANTIDAD" ]; then break; fi
+        if [ -n "$TARGET_ID" ]; then
+            num=$(echo "$TARGET_ID" | sed 's/[^0-9]//g' | sed 's/^0*//')
+            [ -z "$num" ] && num=1
+            asignados=("$num")
+            echo "Estacion especificada: $TARGET_ID (puerto $((PUERTO_BASE_WS + num)))"
+        else
+            asignados=()
+            for ((i=1; i<=100; i++)); do
+                mname=$(printf "ws_m_%02d" "$i")
+                ename=$(printf "ws_e_%02d" "$i")
+                puerto=$((PUERTO_BASE_WS + i))
+                if ! echo "$ACTIVOS" | grep -q -w "$mname" && ! echo "$ACTIVOS" | grep -q -w "$ename"; then
+                    if ! test_puerto "$puerto"; then
+                        asignados+=("$i")
+                        if [ ${#asignados[@]} -ge "$CANTIDAD" ]; then break; fi
+                    fi
                 fi
-            fi
-        done
+            done
+            echo "Lanzando $CANTIDAD WS completas (Monitor + Engine)..."
+        fi
 
-        echo "Lanzando $CANTIDAD WS completas (Monitor + Engine)..."
         for num in "${asignados[@]}"; do
             WS_ID=$(printf "WS-%02d" "$num")
             PUERTO=$((PUERTO_BASE_WS + num))
             NAME_M=$(printf "ws_m_%02d" "$num")
             NAME_E=$(printf "ws_e_%02d" "$num")
 
-            if [ -n "$EXTRA" ] && [ "$CANTIDAD" -eq 1 ]; then
+            if [ -n "$EXTRA" ]; then
                 UBICACION="$EXTRA"
             else
                 UBICACION=$(obtener_ubicacion "$WS_ID")
@@ -203,14 +221,21 @@ case "$TIPO" in
         ;;
 
     engine|e)
-        asignados=()
-        for ((i=1; i<=100; i++)); do
-            ename=$(printf "ws_e_%02d" "$i")
-            if ! echo "$ACTIVOS" | grep -q -w "$ename"; then
-                asignados+=("$i")
-                if [ ${#asignados[@]} -ge "$CANTIDAD" ]; then break; fi
-            fi
-        done
+        if [ -n "$TARGET_ID" ]; then
+            num=$(echo "$TARGET_ID" | sed 's/[^0-9]//g' | sed 's/^0*//')
+            [ -z "$num" ] && num=1
+            asignados=("$num")
+            echo "Engine especificado para: $TARGET_ID"
+        else
+            asignados=()
+            for ((i=1; i<=100; i++)); do
+                ename=$(printf "ws_e_%02d" "$i")
+                if ! echo "$ACTIVOS" | grep -q -w "$ename"; then
+                    asignados+=("$i")
+                    if [ ${#asignados[@]} -ge "$CANTIDAD" ]; then break; fi
+                fi
+            done
+        fi
 
         for num in "${asignados[@]}"; do
             WS_ID=$(printf "WS-%02d" "$num")
@@ -219,6 +244,36 @@ case "$TIPO" in
             CMD_ENGINE="docker run -it --rm --name $NAME_E --add-host=host.docker.internal:host-gateway wm_ws_e $EC2_PUBLIC_IP:$KAFKA_PORT host.docker.internal:$PUERTO"
             echo "-> Lanzando Engine para $WS_ID (: $PUERTO)..."
             lanzar_terminal "[$WS_ID Engine]" "$CMD_ENGINE"
+            sleep 0.3
+        done
+        ;;
+
+    monitor|m)
+        if [ -n "$TARGET_ID" ]; then
+            num=$(echo "$TARGET_ID" | sed 's/[^0-9]//g' | sed 's/^0*//')
+            [ -z "$num" ] && num=1
+            asignados=("$num")
+            echo "Monitor especificado para: $TARGET_ID"
+        else
+            asignados=()
+            for ((i=1; i<=100; i++)); do
+                mname=$(printf "ws_m_%02d" "$i")
+                puerto=$((PUERTO_BASE_WS + i))
+                if ! echo "$ACTIVOS" | grep -q -w "$mname" && ! test_puerto "$puerto"; then
+                    asignados+=("$i")
+                    if [ ${#asignados[@]} -ge "$CANTIDAD" ]; then break; fi
+                fi
+            done
+        fi
+
+        for num in "${asignados[@]}"; do
+            WS_ID=$(printf "WS-%02d" "$num")
+            PUERTO=$((PUERTO_BASE_WS + num))
+            NAME_M=$(printf "ws_m_%02d" "$num")
+            UBICACION="${EXTRA:-$(obtener_ubicacion "$WS_ID")}"
+            CMD_MONITOR="docker run -it --rm --name $NAME_M -p $PUERTO:$PUERTO wm_ws_m $PUERTO $EC2_PUBLIC_IP:$CENTRAL_PORT $WS_ID \"$UBICACION\""
+            echo "-> Lanzando Monitor $WS_ID ($UBICACION) en puerto :$PUERTO..."
+            lanzar_terminal "[$WS_ID Monitor] :$PUERTO" "$CMD_MONITOR"
             sleep 0.3
         done
         ;;

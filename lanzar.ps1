@@ -53,29 +53,31 @@ function Mostrar-Ayuda {
     Write-Host "=================================================================" -ForegroundColor Cyan
     Write-Host "  Lanzador Inteligente - Water Management Network" -ForegroundColor Cyan
     Write-Host "=================================================================" -ForegroundColor Cyan
-    Write-Host "Uso: .\lanzar.bat [CANTIDAD] <TIPO> [EXTRA]"
-    Write-Host "  (O en PowerShell: .\lanzar.ps1 [CANTIDAD] <TIPO> [EXTRA])"
+    Write-Host "Uso: .\lanzar.bat [CANTIDAD] <TIPO> [ID_ESPECIFICO] [EXTRA]"
+    Write-Host "  (O en PowerShell: .\lanzar.ps1 [CANTIDAD] <TIPO> [ID_ESPECIFICO] [EXTRA])"
     Write-Host ""
     Write-Host "Tipos disponibles:"
     Write-Host "  fo | FO          : Field Operator (operario de campo)"
     Write-Host "  ws | WS          : Water Station completa (Monitor + Engine en terminales separadas)"
     Write-Host "  engine | e       : Solo Engine(s) de Water Station"
     Write-Host "  monitor | m      : Solo Monitor(es) de Water Station"
-    Write-Host "  status | info    : Muestra qué estaciones y operarios están corriendo"
+    Write-Host "  status | info    : Muestra que estaciones y operarios estan corriendo"
     Write-Host "  clean | stop     : Detiene y elimina todos los contenedores lanzados"
     Write-Host ""
-    Write-Host "Comportamiento inteligente de IDs y Puertos:"
-    Write-Host "  * Si ya hay 10 WS corriendo y pides 5 WS, parte del puerto 6011 (WS-11 a WS-15)."
-    Write-Host "  * Si cierras la WS-03, la próxima WS ocupará el hueco libre (WS-03 / :6003)."
-    Write-Host "  * Igual con los FOs: reutiliza huecos cerrados o asigna los siguientes."
+    Write-Host "Ejemplos con ID especifico:"
+    Write-Host "  .\lanzar.bat fo FO-12            -> Lanza el operario FO-12"
+    Write-Host "  .\lanzar.bat WS WS-12            -> Lanza la estacion WS-12 (puerto 6012)"
+    Write-Host "  .\lanzar.bat WS WS-12 Campello   -> Lanza WS-12 con ubicacion Campello"
+    Write-Host "  .\lanzar.bat Engine WS-12        -> Lanza solo el Engine de WS-12"
+    Write-Host "  .\lanzar.bat Monitor WS-12       -> Lanza solo el Monitor de WS-12"
     Write-Host ""
-    Write-Host "Ejemplos:"
-    Write-Host "  .\lanzar.bat 20 fo           -> Lanza 20 FOs en terminales (FO-01 a FO-20)"
-    Write-Host "  .\lanzar.bat 5 WS            -> Lanza 5 WS completas (10 terminales: 5 Mon + 5 Eng)"
-    Write-Host "  .\lanzar.bat WS Campello     -> Lanza 1 WS completa con ubicación 'Campello'"
-    Write-Host "  .\lanzar.bat Engine          -> Lanza 1 Engine (para la primera WS huérfana o libre)"
-    Write-Host "  .\lanzar.bat status          -> Ver qué instancias están en marcha"
-    Write-Host "  .\lanzar.bat clean           -> Detener todas las instancias de prueba"
+    Write-Host "Ejemplos sin ID (asignacion automatica de IDs y puertos libres):"
+    Write-Host "  .\lanzar.bat 20 fo               -> Lanza 20 FOs (IDs libres automaticos)"
+    Write-Host "  .\lanzar.bat 5 WS                -> Lanza 5 WS completas en 10 terminales"
+    Write-Host "  .\lanzar.bat WS Campello         -> Lanza 1 WS con ubicacion Campello"
+    Write-Host "  .\lanzar.bat Engine              -> Lanza Engine para primer Monitor sin Engine"
+    Write-Host "  .\lanzar.bat status              -> Ver que instancias estan en marcha"
+    Write-Host "  .\lanzar.bat clean               -> Detener todas las instancias de prueba"
     Write-Host ""
     Write-Host "Configuración actual:"
     Write-Host "  IP Servidor (EC2 / Local) : $EC2_PUBLIC_IP"
@@ -206,8 +208,11 @@ if (-not $Arg1 -or $Arg1 -in @("-h", "--help", "help", "/?")) {
 # ------------------------------------------------------------------------------
 $Cantidad = 1
 $Tipo = ""
+$TargetId = $null
 $Extra = ""
 $CantidadDetectada = $false
+
+$tiposValidos = @("fo", "operario", "ws", "estacion", "engine", "e", "monitor", "m")
 
 $allArgs = @()
 if ($Arg1) { $allArgs += $Arg1 }
@@ -215,16 +220,20 @@ if ($Arg2) { $allArgs += $Arg2 }
 if ($RestArgs) { $allArgs += $RestArgs }
 
 foreach ($a in $allArgs) {
-    if ($a -match "^\d+$" -and -not $CantidadDetectada) {
-        $Cantidad = [int]$a
+    $aTrim = $a.Trim()
+    $aLower = $aTrim.ToLower()
+    if ($aTrim -match "^\d+$" -and -not $CantidadDetectada) {
+        $Cantidad = [int]$aTrim
         $CantidadDetectada = $true
-    } elseif (-not $Tipo) {
-        $Tipo = $a.ToLower()
+    } elseif (-not $Tipo -and $aLower -in $tiposValidos) {
+        $Tipo = $aLower
+    } elseif ($aTrim -match "^(fo|ws)-\d+$" -and $null -eq $TargetId) {
+        $TargetId = $aTrim.ToUpper()
     } else {
         if (-not $Extra) {
-            $Extra = $a
+            $Extra = $aTrim
         } else {
-            $Extra += " $a"
+            $Extra += " $aTrim"
         }
     }
 }
@@ -285,8 +294,14 @@ Write-Host "Solicitado: $Cantidad instancia(s) de '$Tipo'"
 
 switch ($Tipo) {
     { $_ -in @("fo", "operario") } {
-        $ids = Obtener-IdsFoLibres $Cantidad $activos
-        Write-Host "IDs asignados (libres): $( ($ids | ForEach-Object { 'FO-{0:D2}' -f $_ }) -join ', ' )" -ForegroundColor Cyan
+        if ($TargetId) {
+            $num = [int]($TargetId -replace "[^\d]", "")
+            $ids = @($num)
+            Write-Host "ID especificado: $TargetId" -ForegroundColor Cyan
+        } else {
+            $ids = Obtener-IdsFoLibres $Cantidad $activos
+            Write-Host "IDs asignados (libres): $( ($ids | ForEach-Object { 'FO-{0:D2}' -f $_ }) -join ', ' )" -ForegroundColor Cyan
+        }
         Write-Host "-----------------------------------------------------------------" -ForegroundColor Green
 
         foreach ($num in $ids) {
@@ -315,10 +330,16 @@ switch ($Tipo) {
     }
 
     { $_ -in @("ws", "estacion") } {
-        $ids = Obtener-IdsWsLibres $Cantidad $activos
-        $listaWs = $ids | ForEach-Object { "WS-{0:D2} (puerto {1})" -f $_, ($PUERTO_BASE_WS + $_) }
-        Write-Host "Estaciones asignadas (libres): $($listaWs -join ', ')" -ForegroundColor Cyan
-        Write-Host "Se abriran $($Cantidad * 2) terminales en total ($Cantidad Monitores + $Cantidad Engines)..." -ForegroundColor Cyan
+        if ($TargetId) {
+            $num = [int]($TargetId -replace "[^\d]", "")
+            $ids = @($num)
+            Write-Host "Estacion especificada: $TargetId (puerto $($PUERTO_BASE_WS + $num))" -ForegroundColor Cyan
+        } else {
+            $ids = Obtener-IdsWsLibres $Cantidad $activos
+            $listaWs = $ids | ForEach-Object { "WS-{0:D2} (puerto {1})" -f $_, ($PUERTO_BASE_WS + $_) }
+            Write-Host "Estaciones asignadas (libres): $($listaWs -join ', ')" -ForegroundColor Cyan
+        }
+        Write-Host "Se abriran $($ids.Count * 2) terminales en total ($($ids.Count) Monitores + $($ids.Count) Engines)..." -ForegroundColor Cyan
         Write-Host "-----------------------------------------------------------------" -ForegroundColor Green
 
         foreach ($num in $ids) {
@@ -327,7 +348,7 @@ switch ($Tipo) {
             $nameM = "ws_m_{0:D2}" -f $num
             $nameE = "ws_e_{0:D2}" -f $num
 
-            $ubicacion = if ($Extra -and $Cantidad -eq 1) { $Extra } else { Obtener-Ubicacion $wsId }
+            $ubicacion = if ($Extra -and ($TargetId -or $Cantidad -eq 1)) { $Extra } else { Obtener-Ubicacion $wsId }
 
             $cmdArgsM = @(
                 "docker", "run", "-it", "--rm",
@@ -362,26 +383,31 @@ switch ($Tipo) {
     }
 
     { $_ -in @("engine", "e") } {
-        $huerfanos = @()
-        for ($i = 1; $i -le 100; $i++) {
-            $nameM = "ws_m_{0:D2}" -f $i
-            $nameE = "ws_e_{0:D2}" -f $i
-            if (($nameM -in $activos) -and ($nameE -notin $activos)) {
-                $huerfanos += $i
-            }
-        }
-
-        $ids = @()
-        if ($huerfanos.Count -gt 0) {
-            $ids += $huerfanos | Select-Object -First $Cantidad
-        }
-        if ($ids.Count -lt $Cantidad) {
-            $faltan = $Cantidad - $ids.Count
+        if ($TargetId) {
+            $num = [int]($TargetId -replace "[^\d]", "")
+            $ids = @($num)
+        } else {
+            $huerfanos = @()
             for ($i = 1; $i -le 100; $i++) {
+                $nameM = "ws_m_{0:D2}" -f $i
                 $nameE = "ws_e_{0:D2}" -f $i
-                if ($i -notin $ids -and $nameE -notin $activos) {
-                    $ids += $i
-                    if ($ids.Count -ge $Cantidad) { break }
+                if (($nameM -in $activos) -and ($nameE -notin $activos)) {
+                    $huerfanos += $i
+                }
+            }
+
+            $ids = @()
+            if ($huerfanos.Count -gt 0) {
+                $ids += $huerfanos | Select-Object -First $Cantidad
+            }
+            if ($ids.Count -lt $Cantidad) {
+                $faltan = $Cantidad - $ids.Count
+                for ($i = 1; $i -le 100; $i++) {
+                    $nameE = "ws_e_{0:D2}" -f $i
+                    if ($i -notin $ids -and $nameE -notin $activos) {
+                        $ids += $i
+                        if ($ids.Count -ge $Cantidad) { break }
+                    }
                 }
             }
         }
@@ -409,13 +435,18 @@ switch ($Tipo) {
     }
 
     { $_ -in @("monitor", "m") } {
-        $ids = @()
-        for ($i = 1; $i -le 100; $i++) {
-            $nameM = "ws_m_{0:D2}" -f $i
-            $puerto = $PUERTO_BASE_WS + $i
-            if ($nameM -notin $activos -and -not (Test-PuertoOcupado $puerto)) {
-                $ids += $i
-                if ($ids.Count -ge $Cantidad) { break }
+        if ($TargetId) {
+            $num = [int]($TargetId -replace "[^\d]", "")
+            $ids = @($num)
+        } else {
+            $ids = @()
+            for ($i = 1; $i -le 100; $i++) {
+                $nameM = "ws_m_{0:D2}" -f $i
+                $puerto = $PUERTO_BASE_WS + $i
+                if ($nameM -notin $activos -and -not (Test-PuertoOcupado $puerto)) {
+                    $ids += $i
+                    if ($ids.Count -ge $Cantidad) { break }
+                }
             }
         }
 
@@ -426,7 +457,7 @@ switch ($Tipo) {
             $wsId = "WS-{0:D2}" -f $num
             $puerto = $PUERTO_BASE_WS + $num
             $nameM = "ws_m_{0:D2}" -f $num
-            $ubicacion = if ($Extra -and $Cantidad -eq 1) { $Extra } else { Obtener-Ubicacion $wsId }
+            $ubicacion = if ($Extra -and ($TargetId -or $Cantidad -eq 1)) { $Extra } else { Obtener-Ubicacion $wsId }
 
             $cmdArgsM = @(
                 "docker", "run", "-it", "--rm",
