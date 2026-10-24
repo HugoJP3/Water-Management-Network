@@ -4,8 +4,48 @@ WS-02,Retiro
 WS-03,San Juan
 WS-04,Postiguet
 WS-05,Canalejas
-WS-06,Canalejas
-WS-07,Canalejas
-WS-08,Canalejas
-WS-09,Canalejas
-WS-10,Canalejas
+WS-06,Albufereta
+WS-07,Muchavista
+WS-08,Rabasa
+WS-09,Babel
+WS-10,Benalua
+WS-11,Villafranqueza
+WS-12,San Blas
+WS-13,Carolinas
+WS-14,Altozano
+WS-15,Gran Via
+WS-16,Plaza Mar
+WS-17,Florida
+WS-18,San Gabriel
+WS-19,Los Angeles
+WS-20,Tumba del Moro
+WS-21,Cabo Huertas
+WS-22,Alipark
+WS-23,Campoamor
+WS-24,Princesa Mercedes
+WS-25,Ciudad Jardin
+WS-26,Santa Faz
+WS-27,Miriam Blasco
+WS-28,Historiador Vicente Ramos
+WS-29,Condomina
+WS-30,Playa San Juan
+WS-31,Urbanova
+WS-32,El Palmeral
+WS-33,Mercado Central
+WS-34,Luceros
+WS-35,Maisonnave
+WS-36,Diputacion
+WS-37,Pintor Gisbert
+WS-38,Aguas de Alicante
+WS-39,San Nicolas
+WS-40,Santa Barbara
+WS-41,San Fernando
+WS-42,La Goteta
+WS-43,Garbinet
+WS-44,Juan XXIII
+WS-45,Virgen del Remedio
+WS-46,Colonia Requena
+WS-47,Cuatro Osetas
+WS-48,Poligono Espartales
+WS-49,Bacarot
+WS-50,Fontcalent
