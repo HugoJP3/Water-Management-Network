@@ -4,7 +4,7 @@
 # Water Management Network - Sistemas Distribuidos
 # ==============================================================================
 
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." >/dev/null 2>&1 && pwd)"
 
 # Si estamos en Windows (Git Bash, MINGW, MSYS, Cygwin), delegar en lanzar.ps1
 # con ExecutionPolicy Bypass para máxima compatibilidad con terminales desacopladas

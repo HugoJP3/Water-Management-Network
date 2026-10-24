@@ -19,13 +19,14 @@ param(
     [string[]]$RestArgs
 )
 
-$PSScriptRoot = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
-Set-Location $PSScriptRoot
+$ScriptDir = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+$ProjectRoot = Split-Path -Parent -Path $ScriptDir
+Set-Location $ProjectRoot
 
 # ------------------------------------------------------------------------------
 # 1. Cargar variables de entorno desde .env
 # ------------------------------------------------------------------------------
-$envFile = Join-Path $PSScriptRoot ".env"
+$envFile = Join-Path $ProjectRoot ".env"
 $EC2_PUBLIC_IP = "localhost"
 
 if (Test-Path $envFile) {
@@ -116,7 +117,7 @@ function Test-PuertoOcupado([int]$port) {
 }
 
 function Obtener-Ubicacion([string]$id) {
-    $stationsFile = Join-Path $PSScriptRoot "WM_Central\stations.txt"
+    $stationsFile = Join-Path $ProjectRoot "WM_Central\stations.txt"
     if (Test-Path $stationsFile) {
         foreach ($line in Get-Content $stationsFile) {
             $line = $line.Trim()
@@ -141,7 +142,7 @@ function Abrir-Terminal([string]$titulo, [string[]]$cmdArgs) {
     # Construir el bloque que correrá en la nueva ventana
     $childScript = @"
 `$Host.UI.RawUI.WindowTitle = '$titulo'
-Set-Location '$PSScriptRoot'
+Set-Location '$ProjectRoot'
 Write-Host '=====================================================' -ForegroundColor Cyan
 Write-Host '  $titulo' -ForegroundColor Cyan
 Write-Host '=====================================================' -ForegroundColor Cyan
@@ -157,7 +158,7 @@ if (`$LASTEXITCODE -ne 0) {
     $bytes = [System.Text.Encoding]::Unicode.GetBytes($childScript)
     $encoded = [Convert]::ToBase64String($bytes)
 
-    Start-Process powershell.exe -WorkingDirectory $PSScriptRoot -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-EncodedCommand", $encoded
+    Start-Process powershell.exe -WorkingDirectory $ProjectRoot -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-EncodedCommand", $encoded
 }
 
 # ------------------------------------------------------------------------------
