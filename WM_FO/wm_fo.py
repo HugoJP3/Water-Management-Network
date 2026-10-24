@@ -199,22 +199,25 @@ class FieldOperator:
         log(f"Pidiendo riego en {ws} durante {segundos} s...")
         self.bus.publish(TOPIC_PETICIONES, SEP.join(["REQUEST", self.id, ws, str(segundos)]))
 
-        with self.cond:
-            p = self.peticion
-            while p["resultado"] is None:
-                restante = p["limite"] - time.time()
-                if restante <= 0:
-                    if p["fase"] == "REPLY":
-                        p["resultado"] = (False, "Central no ha contestado")
-                    else:
-                        p["resultado"] = (False, "no llegó el resumen final")
-                    log(f"[{ws}] {p['resultado'][1]}")
-                    break
-                self.cond.wait(timeout=restante)
-            exito, detalle = p["resultado"]
-            self.peticion = None
-        log(f"Petición a {ws} terminada: {'ÉXITO' if exito else 'FALLO'} ({detalle})")
-        return exito
+        try:
+            with self.cond:
+                p = self.peticion
+                while p["resultado"] is None:
+                    restante = p["limite"] - time.time()
+                    if restante <= 0:
+                        if p["fase"] == "REPLY":
+                            p["resultado"] = (False, "Central no ha contestado")
+                        else:
+                            p["resultado"] = (False, "no llegó el resumen final")
+                        log(f"[{ws}] {p['resultado'][1]}")
+                        break
+                    self.cond.wait(timeout=restante)
+                exito, detalle = p["resultado"]
+            log(f"Petición a {ws} terminada: {'ÉXITO' if exito else 'FALLO'} ({detalle})")
+            return exito
+        finally:
+            with self.cond:
+                self.peticion = None
 
     def consultar_ultimo_servicio(self):
         log("Consultando a CENTRAL el resultado del último servicio...")

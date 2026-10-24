@@ -1,0 +1,9 @@
+// Archivo de peticiones para Field Operators (FO)
+// Formato: ESTACION#DURACION_SEGUNDOS
+// Puedes editar este archivo mientras los contenedores están corriendo.
+// En el menú del FO pulsa [2] y Enter para ejecutarlo en vivo.
+
+WS-01#10
+WS-02#15
+WS-03#8
+WS-01#5

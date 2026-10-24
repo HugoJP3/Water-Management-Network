@@ -82,22 +82,25 @@ docker save wm_fo wm_ws_m wm_ws_e -o wm_images.tar
 docker load -i wm_images.tar
 ```
 ### 💻 Lanzar las imágenes Cliente
-#### 🚀 Script de Lanzamiento Rápido en Terminales (lanzar.sh / lanzar.ps1)
-Para lanzar múltiples instancias de golpe en terminales independientes (ideal para evaluación y pruebas masivas):
+#### 🚀 Script de Lanzamiento Rápido en Terminales (lanzar.bat / lanzar.sh / lanzar.ps1)
+Lanza múltiples instancias en terminales independientes detectando automáticamente IDs y puertos libres (reutiliza huecos de instancias cerradas):
+
 `ash
+# En Windows (PowerShell / CMD):
+.\lanzar.bat 20 fo          # Lanza 20 FOs en terminales (FO-01 a FO-20)
+.\lanzar.bat 5 WS           # Lanza 5 WS completas (10 terminales: 5 Monitores + 5 Engines)
+.\lanzar.bat WS Campello    # Lanza 1 WS completa con ubicación 'Campello'
+.\lanzar.bat Engine         # Lanza 1 Engine (para la primera WS huérfana o libre)
+.\lanzar.bat status         # Muestra qué FOs y WS están corriendo
+.\lanzar.bat clean          # Detiene y limpia todos los contenedores fo/ws lanzados
+
 # En Git Bash / Linux / macOS:
-./lanzar.sh 20 fo            # Lanza 20 FOs en terminales (FO-01 a FO-20)
-./lanzar.sh 5 WS             # Lanza 5 WS completas (Monitor + Engine en puertos 6001-6005)
-./lanzar.sh WS Campello      # Lanza 1 WS completa con ubicación 'Campello'
-./lanzar.sh Engine           # Lanza 1 Engine (para WS-01)
-./lanzar.sh 3 Engine         # Lanza 3 Engines (WS-01 a WS-03)
-./lanzar.sh clean            # Detiene y limpia todos los contenedores fo/ws lanzados
-# En PowerShell (Windows nativo):
-.\lanzar.ps1 20 fo
-.\lanzar.ps1 5 WS
-.\lanzar.ps1 WS Campello
-.\lanzar.ps1 clean
+./lanzar.sh 20 fo
+./lanzar.sh 5 WS
+./lanzar.sh status
+./lanzar.sh clean
 `
+
 > El script toma automáticamente la dirección de Kafka y Central desde la variable EC2_PUBLIC_IP del archivo .env.
 ---
 #### 1. Field Operator (Manual)

@@ -1,0 +1,7 @@
+// Archivo de peticiones para Field Operators (FO)
+// Formato: ESTACION#DURACION_SEGUNDOS
+WS-01#2
+WS-02#3
+WS-03#8
+WS-05#5
+WS-010#5
