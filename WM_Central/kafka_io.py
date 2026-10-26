@@ -86,17 +86,15 @@ def consume_forever(bootstrap: str, stop_event):
     consumer = Consumer({
         "bootstrap.servers": bootstrap,
         "group.id": "wm-central",
-        # 'latest': si Central estuvo caído, no reprocesa peticiones antiguas
-        # (no queremos abrir riegos de hace horas).
         "auto.offset.reset": "latest",
-        "enable.auto.commit": True,
+        "enable.auto.commit": False,
         "session.timeout.ms": 10000,
     })
 
     def on_assign(consumer, partitions):
-        # Si Central se reinicia, no queremos reprocesar peticiones antiguas.
         for p in partitions:
-            p.offset = OFFSET_END
+            if p.topic == logic.T_FO_REQUESTS:
+                p.offset = OFFSET_END
         consumer.assign(partitions)
 
     consumer.subscribe([logic.T_FO_REQUESTS, logic.T_WS_TELEMETRY], on_assign=on_assign)
@@ -122,5 +120,9 @@ def consume_forever(bootstrap: str, stop_event):
                 # Un mensaje roto no debe tumbar a Central
                 logic.log("ERROR procesando un mensaje de Kafka:\n"
                           + traceback.format_exc())
+            try:
+                consumer.commit(message=msg, asynchronous=False)
+            except KafkaException as e:
+                logic.log(f"AVISO: no se pudo confirmar el offset en Kafka: {e}")
     finally:
         consumer.close()

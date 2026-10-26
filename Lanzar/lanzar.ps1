@@ -282,11 +282,11 @@ function Obtener-IdsWsLibres([int]$pedidos, [string[]]$contenedoresActivos) {
 # ------------------------------------------------------------------------------
 # 6. Lanzamiento según tipo
 # ------------------------------------------------------------------------------
-$peticionesDir = Join-Path $PSScriptRoot "peticiones"
-$requestsDir   = Join-Path $PSScriptRoot "requests"
+$peticionesDir = Join-Path $ProjectRoot "peticiones"
+$requestsDir   = Join-Path $ProjectRoot "requests"
 $requestsFile  = Join-Path $requestsDir "requests.txt"
 if (-not (Test-Path $requestsFile)) {
-    $requestsFile = Join-Path $PSScriptRoot "WM_FO\requests.txt"
+    $requestsFile = Join-Path $ProjectRoot "WM_FO\requests.txt"
 }
 
 Write-Host "-----------------------------------------------------------------" -ForegroundColor Green

@@ -71,7 +71,7 @@ def init_db():
 # ---------------------------------------------------------------- operarios
 def add_operator(operator_id, name=None):
     with _conn() as c:
-        c.execute("""INSERT INTO operator (id, name) VALUES (?, ?)"
+        c.execute("""INSERT INTO operator (id, name) VALUES (?, ?)
                         ON CONFLICT(id) DO UPDATE SET name = excluded.name""",
                   (operator_id, name))
 
@@ -219,6 +219,13 @@ def start_watering(ws_id, operator_id) -> bool:
                   AND leak = 0 AND watering = 0
         """, (operator_id, ws_id))
         return cur.rowcount == 1
+
+
+def set_watering(ws_id, operator_id):
+    with _conn() as c:
+        c.execute("""UPDATE watering_station
+                     SET watering = 1, operator_id = ?
+                     WHERE id = ? AND connected = 1""", (operator_id, ws_id))
 
 
 def update_telemetry(ws_id, flow, volume):

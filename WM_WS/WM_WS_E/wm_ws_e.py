@@ -125,6 +125,9 @@ class Engine:
         # Estado compartido entre hilos. SIEMPRE se toca con self.lock.
         self.lock = threading.RLock()
         self.monitor_conectado = False  # True cuando el socket con el Monitor está activo
+        self.central_ok = False
+        self.bus_listo = threading.Event()
+        self.pendiente_kafka = None
         self.averia = False       # avería simulada (tecla)
         self.bloqueada = False    # puesta fuera de servicio por CENTRAL
         self.riego = None         # None, o dict con los datos del riego en curso
@@ -145,7 +148,12 @@ class Engine:
     def salud(self):
         """Lo que contestamos a HEALTH."""
         with self.lock:
-            return "KO" if self.averia else "OK"
+            base = "KO" if self.averia else "OK"
+            r = self.riego
+            if r is None:
+                return base
+            return protocol.pack(base, "RIEGO", r["operario"], f"{r['litros']:.1f}",
+                                 f"{time.time() - r['inicio']:.0f}")
 
     # -------------------------------------------------------------- riego
     def iniciar_riego(self, operario, segundos):
@@ -159,6 +167,8 @@ class Engine:
                 return False, "la estación está fuera de servicio"
             if self.riego is not None:
                 return False, "ya está regando"
+            if operario == "MANUAL" and not self.central_ok:
+                return False, "Imposible conectar con WM_Central (no se admiten riegos)"
             ahora = time.time()
             self.riego = {"operario": operario, "limite": segundos,
                           "inicio": ahora, "ultimo": ahora, "litros": 0.0}
@@ -175,7 +185,8 @@ class Engine:
             self.riego = None
             duracion = time.time() - r["inicio"]
             mensaje = protocol.pack("END_WATERING", self.ws_id,
-                                    f"{r['litros']:.1f}", f"{duracion:.0f}", motivo)
+                                    f"{r['litros']:.1f}", f"{duracion:.0f}", motivo,
+                                    r["operario"])
         self.bus.publish(TOPIC_TELEMETRIA, mensaje)
         log(f"RIEGO TERMINADO ({motivo}): {r['litros']:.1f} L en {duracion:.0f} s "
             f"(electroválvula CERRADA)")
@@ -226,6 +237,8 @@ class Engine:
             ok, motivo = self.iniciar_riego(campos[2], segundos)
             if not ok:
                 log(f"No puedo iniciar el riego: {motivo}")
+                self.bus.publish(TOPIC_TELEMETRIA,
+                                 protocol.pack("REJECTED", self.ws_id, campos[2], motivo))
         elif orden == "STOP":
             self.terminar_riego("STOP")
         elif orden == "BLOCK":
@@ -271,19 +284,45 @@ class Engine:
                 # Bucle de salud: contestar a cada HEALTH
                 while True:
                     mensaje = protocol.recv_message(sock)
-                    if mensaje == "HEALTH":
+                    campos = protocol.unpack(mensaje)
+                    if campos[0] == "HEALTH":
+                        if len(campos) > 1:
+                            self._actualizar_central(campos[1] == "CENTRAL_OK")
                         protocol.send_message(sock, self.salud())
+                    elif campos[0] == "PENDING" and len(campos) >= 4:
+                        protocol.send_message(sock, "OK")
+                        self._riego_recuperado(campos[1], campos[2], campos[3])
                     else:
                         log(f"Mensaje inesperado del Monitor: {mensaje}")
             except ERRORES_RED as e:
                 with self.lock:
                     self.monitor_conectado = False
+                    self.central_ok = False
                 if not avisado:
                     log(f"Sin conexión con el Monitor ({e}). Estación AVERIADA. Reintentando...")
                     avisado = True
+                self.terminar_riego("MONITOR_CAIDO")
                 if sock is not None:
                     sock.close()
                 time.sleep(2)
+
+    def _riego_recuperado(self, operario, litros, segundos):
+        mensaje = protocol.pack("END_WATERING", self.ws_id, litros, segundos,
+                                "CAIDA_ENGINE", operario)
+        log(f"Riego anterior interrumpido por la caída del Engine ({operario}): "
+            f"{litros} L en {segundos} s. Se envía el estado final a CENTRAL")
+        if self.bus_listo.is_set():
+            self.bus.publish(TOPIC_TELEMETRIA, mensaje)
+        else:
+            self.pendiente_kafka = mensaje
+
+    def _actualizar_central(self, ok):
+        with self.lock:
+            cambio = ok != self.central_ok
+            self.central_ok = ok
+        if cambio:
+            log("Conexión con WM_Central restablecida" if ok else
+                "Imposible conectar con WM_Central: no se admiten nuevos riegos")
 
     def hilo_comandos(self):
         self.bus.escuchar(self.procesar_comando)
@@ -303,7 +342,8 @@ class Engine:
                 r["litros"] += caudal * (ahora - r["ultimo"]) / 60.0      # L
                 r["ultimo"] = ahora
                 mensaje = protocol.pack("TELEMETRY", self.ws_id, r["operario"],
-                                        f"{caudal:.1f}", f"{r['litros']:.1f}")
+                                        f"{caudal:.1f}", f"{r['litros']:.1f}",
+                                        f"{ahora - r['inicio']:.0f}")
                 caducado = (ahora - r["inicio"]) >= r["limite"]
                 resumen = f"Regando ({r['operario']}): {caudal:.1f} L/min, {r['litros']:.1f} L"
             self.bus.publish(TOPIC_TELEMETRIA, mensaje)
@@ -368,6 +408,10 @@ class Engine:
         self.id_listo.wait()    # hasta que el Monitor nos diga el id
 
         self.bus.conectar(self.ws_id)
+        self.bus_listo.set()
+        if self.pendiente_kafka is not None:
+            self.bus.publish(TOPIC_TELEMETRIA, self.pendiente_kafka)
+            self.pendiente_kafka = None
         threading.Thread(target=self.hilo_comandos, daemon=True).start()
         threading.Thread(target=self.hilo_riego, daemon=True).start()
         log(f"Engine de {self.ws_id} listo")

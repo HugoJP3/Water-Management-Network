@@ -91,7 +91,7 @@ def cerrar(sock):
 
 
 # ---------------------------------------------------------------------- ENGINE
-def esperar_engine(servidor, ws_id):
+def esperar_engine(servidor, ws_id, pendiente=None):
     """Espera (como mucho INTERVALO segundos) a que se conecte el Engine.
     Devuelve el socket del Engine ya identificado, o None si no hay nadie."""
     try:
@@ -108,6 +108,11 @@ def esperar_engine(servidor, ws_id):
         respuesta = protocol.recv_message(conn)
         if respuesta == "OK":
             log(f"Engine conectado desde {addr[0]}:{addr[1]}")
+            if pendiente is not None:
+                protocol.send_message(conn, protocol.pack("PENDING", *pendiente))
+                protocol.recv_message(conn)
+                log(f"Enviado al Engine el riego interrumpido por su caída "
+                    f"({pendiente[0]}: {pendiente[1]} L en {pendiente[2]} s)")
             return conn
         log(f"Engine rechazado: contestó {respuesta!r} al ID")
     except ERRORES_RED as e:
@@ -116,17 +121,21 @@ def esperar_engine(servidor, ws_id):
     return None
 
 
-def comprobar_engine(conn):
+def comprobar_engine(conn, central_ok=True):
     """Pregunta HEALTH al Engine.
     Devuelve:  "OK"     -> el Engine está bien
                "KO"     -> el Engine informa de avería (sigue conectado)
                "CAIDO"  -> no contesta a tiempo o se ha desconectado"""
     try:
-        protocol.send_message(conn, "HEALTH")
+        protocol.send_message(conn, protocol.pack(
+            "HEALTH", "CENTRAL_OK" if central_ok else "CENTRAL_KO"))
         respuesta = protocol.recv_message(conn)
     except ERRORES_RED:
-        return "CAIDO"
-    return "OK" if respuesta == "OK" else "KO"
+        return "CAIDO", None
+    campos = protocol.unpack(respuesta)
+    estado = "OK" if campos[0] == "OK" else "KO"
+    riego = tuple(campos[2:5]) if len(campos) >= 5 and campos[1] == "RIEGO" else None
+    return estado, riego
 
 
 # ------------------------------------------------------------------------ main
@@ -146,6 +155,8 @@ def main():
     engine = None
     estado_anterior = None
     central_avisada = False   # para no repetir el mensaje "sin CENTRAL" cada segundo
+    riego_engine = None
+    pendiente = None
 
     try:
         while True:
@@ -167,14 +178,23 @@ def main():
 
             # 2. Asegurar la conexión con el Engine
             if engine is None:
-                engine = esperar_engine(servidor, ws_id)   # puede tardar hasta 1 s
+                engine = esperar_engine(servidor, ws_id, pendiente)   # puede tardar hasta 1 s
+                if engine is not None:
+                    pendiente = None
 
             # 3. Estado de salud
             if engine is None:
                 estado = "FUGA"
                 motivo = "Engine no conectado"
             else:
-                resultado = comprobar_engine(engine)
+                resultado, riego = comprobar_engine(engine, central is not None)
+                if resultado != "CAIDO":
+                    riego_engine = riego
+                elif riego_engine is not None:
+                    pendiente = riego_engine
+                    riego_engine = None
+                    log(f"El Engine se cayó durante un riego de {pendiente[0]} "
+                        f"({pendiente[1]} L en {pendiente[2]} s): se le enviará al recuperarse")
                 if resultado == "OK":
                     estado, motivo = "OK", ""
                 elif resultado == "KO":

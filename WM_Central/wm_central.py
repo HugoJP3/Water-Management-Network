@@ -104,10 +104,10 @@ def handle_monitor(conn: socket.socket, addr):
                 pass
 
         # 4) Alta/reconexión en la BD y confirmación al Monitor
-        logic.abort_session(ws_id, "estación reconectada")   # por si quedaba un riego colgado
         db.register_station(ws_id, location)
         proto.send_message(conn, proto.pack("ACK_REGISTER", "OK"))
         log(f"{ws_id} -> registrada/conectada ({location}) desde {addr[0]}")
+        logic.restore_session(ws_id)
         logic.sync_station(ws_id)        # si estaba bloqueada, se lo recordamos
 
         # 5) Bucle de latidos
@@ -174,13 +174,7 @@ def load_authorized_stations(path: str = "stations.txt"):
         _authorized_stations = {f"WS-{i:02d}" for i in range(1, 21)}
 
 def is_authorized_station(ws_id: str) -> bool:
-    import re
-    if ws_id in _authorized_stations:
-        return True
-    # Si stations.txt no existe o solo hay algunas, aceptar formato estándar WS-01..WS-20
-    if re.match(r"^WS-(0[1-9]|1[0-9]|20)$", ws_id):
-        return True
-    return False
+    return ws_id in _authorized_stations
 
 def load_operators(path: str = "operators.txt"):
     """Da de alta los operarios desde un fichero de texto (una línea por

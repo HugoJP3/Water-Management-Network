@@ -45,6 +45,7 @@ ALL_TOPICS = [T_FO_REQUESTS, T_FO_NOTIFICATIONS, T_WS_COMMANDS,
 # da el riego por perdido y libera la estación. La estación manda una
 # telemetría cada segundo, así que 5 s deja margen.
 STALL_TIMEOUT = 5
+CLOSING_TTL = 5
 
 
 # -------------------------------------------------------------------- log
@@ -95,8 +96,6 @@ def send(topic: str, message: str):
 #   CENTRAL -> riego iniciado desde el panel de CENTRAL
 # operators.txt queda solo para los operarios reales que da de alta el admin.
 INTERNAL_OPERATORS = {
-    "ENGINE": "Admin: Riego manual desde la estación",
-    "MANUAL": "Operario: Riego manual en la estación",
     "CENTRAL": "Admin: Riego iniciado desde central",
 }
 
@@ -140,14 +139,25 @@ def _deny(operator_id: str, ws_id: str, motivo: str):
 # init_db() deja las estaciones DESCONECTADAS y no hay riegos que recuperar).
 #   _sessions["WS-01"] = {"operator": "FO-12", "start": t0, "last_tele": t}
 _sessions = {}
+_closing = {}
 _lock = threading.Lock()   # sockets, Kafka y housekeeping tocan _sessions a la vez
 
 
 def _open_session(ws_id: str, operator_id: str):
     now = time.time()
     with _lock:
+        _closing.pop(ws_id, None)
         _sessions[ws_id] = {"operator": operator_id, "start": now,
                             "last_tele": now}
+
+
+def restore_session(ws_id: str):
+    with _lock:
+        s = _sessions.get(ws_id)
+        op = s["operator"] if s else None
+    if op is not None:
+        db.set_watering(ws_id, op)
+        log(f"{ws_id} -> reconectada con un riego en curso de {op}: el riego continúa")
 
 
 def abort_session(ws_id: str, motivo: str, send_stop: bool = True) -> bool:
@@ -158,6 +168,8 @@ def abort_session(ws_id: str, motivo: str, send_stop: bool = True) -> bool:
     """
     with _lock:
         s = _sessions.pop(ws_id, None)
+        if s is not None:
+            _closing[ws_id] = time.time()
     if s is None:
         return False
 
@@ -243,32 +255,61 @@ def handle_telemetry(fields):
     """ws-telemetry: TELEMETRY#... (cada segundo) y END_WATERING#..."""
     kind = fields[0] if fields else ""
 
-    if kind == "TELEMETRY" and len(fields) == 5:
-        _, ws_id, _op, flow, volume = fields
+    if kind == "TELEMETRY" and len(fields) in (5, 6):
+        _, ws_id, _op, flow, volume = fields[:5]
         try:
             flow, volume = float(flow), float(volume)
+            elapsed = float(fields[5]) if len(fields) == 6 else 0.0
         except ValueError:
             log(f"Telemetría con números inválidos: {fields}")
             return
+        now = time.time()
+        nueva = False
         with _lock:
             s = _sessions.get(ws_id)
             if s is None:
-                # La estación inició el riego de forma autónoma/manual
+                cerrada = _closing.get(ws_id)
+                if cerrada is not None and now - cerrada < CLOSING_TTL:
+                    return
                 op_name = _op or "MANUAL"
-                _sessions[ws_id] = {"operator": op_name, "start": time.time(), "last_tele": time.time()}
-                s = _sessions[ws_id]
-                db.start_watering(ws_id, op_name)
-                log(f"{ws_id} -> Riego autónomo/manual detectado (Operario: {op_name})")
+                _sessions[ws_id] = {"operator": op_name, "start": now - elapsed,
+                                    "last_tele": now}
+                nueva = True
             else:
-                s["last_tele"] = time.time()
+                s["last_tele"] = now
+        if nueva:
+            db.set_watering(ws_id, op_name)
+            log(f"{ws_id} -> riego en curso detectado por telemetría (operario: {op_name})")
         db.update_telemetry(ws_id, flow, volume)
 
-    elif kind == "END_WATERING" and len(fields) == 5:
-        _, ws_id, litros, segundos, motivo = fields
+    elif kind == "REJECTED" and len(fields) >= 4:
+        _, ws_id, op, motivo = fields[0], fields[1], fields[2], "#".join(fields[3:])
+        with _lock:
+            s = _sessions.get(ws_id)
+            if s is not None and s["operator"] == op:
+                _sessions.pop(ws_id)
+            else:
+                s = None
+        if s is None:
+            log(f"{ws_id} -> rechazo de START de {op} ignorado (no hay sesión suya)")
+            return
+        db.end_watering(ws_id)
+        log(f"{ws_id} -> la estación RECHAZÓ el riego de {op}: {motivo}")
+        if op not in INTERNAL_OPERATORS:
+            _deny(op, ws_id, f"La estación ha rechazado el riego: {motivo}")
+
+    elif kind == "END_WATERING" and len(fields) in (5, 6):
+        _, ws_id, litros, segundos, motivo = fields[:5]
+        op_msg = fields[5] if len(fields) == 6 and fields[5] else None
         with _lock:
             s = _sessions.pop(ws_id, None)
+            cerrada = _closing.pop(ws_id, None)
+        if s is None and cerrada is not None and motivo != "CAIDA_ENGINE":
+            db.end_watering(ws_id)
+            log(f"{ws_id} -> la estación confirma el fin del riego ({motivo}): {litros} L en {segundos} s")
+            return
         db.end_watering(ws_id)
-        op = s["operator"] if s else "MANUAL"
+        op = s["operator"] if s else (op_msg or "MANUAL")
         try:
             db.save_operator_summary(op, ws_id, float(litros), int(segundos), str(motivo))
         except Exception as e:

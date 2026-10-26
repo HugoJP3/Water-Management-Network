@@ -37,10 +37,12 @@ import time
 TOPIC_PETICIONES = "fo-requests"
 TOPIC_NOTIFICACIONES = "fo-notifications"
 TOPIC_ESTADOS = "ws-status"       # propuesta, ver arriba
+TOPIC_TELEMETRIA = "ws-telemetry"
 
 ESPERA_REPLY = 15       # segundos esperando que Central autorice o deniegue
 MARGEN_RESUMEN = 30     # segundos extra (sobre la duración) esperando el SUMMARY
 PAUSA_FICHERO = 4       # segundos entre peticiones del fichero (lo pide el enunciado)
+CENTRAL_SILENCIO = 6
 FICHERO_DEFECTO = os.path.join(os.path.dirname(__file__), "requests.txt")
 
 SEP = "#"
@@ -74,7 +76,7 @@ class KafkaBus:
                 # TODAS las notificaciones y filtra por su id (si compartieran
                 # grupo, Kafka se las repartiría y a algunos no les llegarían).
                 self.consumer = KafkaConsumer(
-                    TOPIC_NOTIFICACIONES, TOPIC_ESTADOS,
+                    TOPIC_NOTIFICACIONES, TOPIC_ESTADOS, TOPIC_TELEMETRIA,
                     bootstrap_servers=self.bootstrap,
                     group_id=f"fo-{fo_id}-{int(time.time())}",
                     auto_offset_reset="latest",
@@ -123,13 +125,42 @@ class FieldOperator:
         self.peticion = None      # petición en curso (dict) o None
         self.estaciones = {}      # ws_id -> (estado, ubicación), del tema ws-status
         self.ultimo_resumen = None
+        self.ultimo_estado = time.time()
+        self.central_caida = False
+        self.fin_riego = {}
 
     # ------------------------------------------- mensajes que llegan por Kafka
     def procesar_mensaje(self, tema, texto):
         if tema == TOPIC_ESTADOS:
             self._procesar_estado(texto)
+        elif tema == TOPIC_TELEMETRIA:
+            self._procesar_telemetria(texto)
         else:
             self._procesar_notificacion(texto)
+
+    def _procesar_telemetria(self, texto):
+        campos = texto.split(SEP)
+        if len(campos) >= 5 and campos[0] == "TELEMETRY" and campos[2] == self.id:
+            if time.time() - self.fin_riego.get(campos[1], 0) < 2:
+                return
+            log(f"[{campos[1]}] Regando: {campos[3]} L/min · {campos[4]} L acumulados")
+
+    def hilo_vigilancia(self):
+        while True:
+            time.sleep(1)
+            with self.cond:
+                silencio = time.time() - self.ultimo_estado
+                caida_ahora = silencio > CENTRAL_SILENCIO
+                cambio = caida_ahora != self.central_caida
+                self.central_caida = caida_ahora
+                p = self.peticion
+                if (caida_ahora and p is not None and p["fase"] == "REPLY"
+                        and p["resultado"] is None):
+                    p["resultado"] = (False, "Imposible conectar con WM_Central")
+                    self.cond.notify_all()
+            if cambio:
+                log("ERROR: Imposible conectar con WM_Central" if caida_ahora
+                    else "Conexión con WM_Central restablecida")
 
     def _procesar_estado(self, texto):
         campos = texto.split(SEP)
@@ -143,6 +174,7 @@ class FieldOperator:
                 nuevas[ws] = (estado, ubicacion)
         with self.cond:
             self.estaciones = nuevas
+            self.ultimo_estado = time.time()
 
     def _procesar_notificacion(self, texto):
         campos = texto.split(SEP)
@@ -177,6 +209,7 @@ class FieldOperator:
             log(texto_resumen)
             with self.cond:
                 self.ultimo_resumen = texto_resumen
+                self.fin_riego[ws] = time.time()
             self._terminar_peticion(ws, True, f"{litros} L en {segundos} s")
 
     def _terminar_peticion(self, ws, exito, detalle):
@@ -191,6 +224,9 @@ class FieldOperator:
         """Envía la petición y BLOQUEA hasta que termina (resumen, denegación o
         timeout). Devuelve True si el riego se hizo, False si falló."""
         with self.cond:
+            if self.central_caida:
+                log(f"[{ws}] Imposible conectar con WM_Central: no se puede pedir el riego")
+                return False
             if self.peticion is not None:
                 print("Ya hay una petición en curso")
                 return False
@@ -206,7 +242,7 @@ class FieldOperator:
                     restante = p["limite"] - time.time()
                     if restante <= 0:
                         if p["fase"] == "REPLY":
-                            p["resultado"] = (False, "Central no ha contestado")
+                            p["resultado"] = (False, "Imposible conectar con WM_Central (no ha contestado)")
                         else:
                             p["resultado"] = (False, "no llegó el resumen final")
                         log(f"[{ws}] {p['resultado'][1]}")
@@ -326,6 +362,7 @@ class FieldOperator:
         self.bus.conectar(self.id)
         threading.Thread(target=self.bus.escuchar, args=(self.procesar_mensaje,),
                          daemon=True).start()
+        threading.Thread(target=self.hilo_vigilancia, daemon=True).start()
         log(f"Operario {self.id} listo")
         time.sleep(0.5)
         self.consultar_ultimo_servicio()
