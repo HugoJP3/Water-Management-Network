@@ -1,9 +1,0 @@
-> No tenemos ni idea de Kafka, Railway, Dockers y hace un año que no tenemos nada con BBDD y GitHub. Guíanos con esta práctica.
-
-> Haz un diagrama entidad-relación que represente la BBDD que te adjunto.
-
-> Realiza una auditoría de los códigos que te paso buscando errores o posibles mejoras.
-
-> Diseña un protocolo de comunicación con sockets para emplear desde los distintos códigos.
-
-> Diseña un panel web para la central que te muestro y compatible con railway.
